@@ -1,5 +1,7 @@
-# DEV.to search articles by tag or keyword
-url: "https://dev.to/api/articles?tag={{query}}&per_page={{limit}}"
+# DEV.to search articles by keyword (full-text search endpoint)
+# Note: /api/articles?tag= only accepts single-word tags and returns 404 for multi-word queries.
+# Use the search endpoint for keyword queries instead.
+url: "https://dev.to/api/articles/search?q={{query}}&per_page={{limit}}"
 paginate:
   type: offset
   limit: "{{limit}}"

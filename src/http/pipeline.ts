@@ -29,11 +29,19 @@ export interface PipelineConfig {
   sort?: string; // "field desc" or "field asc"
 }
 
-/** Substitute {{var}} placeholders in a string. */
-function interpolate(template: string, vars: Record<string, unknown>): string {
+/** Substitute {{var}} placeholders in a string.
+ * When `encodeValues` is true (URL building), string values are percent-encoded
+ * but colons are preserved so GitHub-style search qualifiers (e.g. language:python)
+ * remain valid. Numeric values are never encoded (safe as-is).
+ */
+function interpolate(template: string, vars: Record<string, unknown>, encodeValues = false): string {
   return template.replace(/\{\{(\w+)\}\}/g, (_, key) => {
     const val = vars[key];
-    return val !== undefined ? String(val) : '';
+    if (val === undefined) return '';
+    const str = String(val);
+    if (!encodeValues || typeof val === 'number') return str;
+    // Encode but restore colons so search qualifiers survive (language:python, etc.)
+    return encodeURIComponent(str).replace(/%3A/gi, ':');
   });
 }
 
@@ -139,7 +147,7 @@ export async function executePipeline(
   const limit = vars.limit ?? 20;
   const allVars = { limit, ...vars };
 
-  const url = interpolate(config.url, allVars);
+  const url = interpolate(config.url, allVars, true);
 
   if (config.paginate?.type === 'ids') {
     // Fetch ID list, then each item individually.
@@ -150,7 +158,7 @@ export async function executePipeline(
     const itemUrlTemplate = config.paginate.itemUrl ?? '';
     const rawItems = await Promise.all(
       sliced.map((id) =>
-        request<Record<string, unknown>>(interpolate(itemUrlTemplate, { ...allVars, id }))
+        request<Record<string, unknown>>(interpolate(itemUrlTemplate, { ...allVars, id }, true))
           .catch(() => null)
       )
     );

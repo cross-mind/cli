@@ -1,5 +1,6 @@
-# Stack Overflow search questions by keyword
-url: "https://api.stackexchange.com/2.3/search?order=desc&sort=relevance&intitle={{query}}&site=stackoverflow&pagesize={{limit}}&filter=default"
+# Stack Overflow full-text search questions by keyword
+# Uses q= (full-text) instead of intitle= so natural language queries return results.
+url: "https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&q={{query}}&site=stackoverflow&pagesize={{limit}}&filter=default"
 paginate:
   type: offset
   limit: "{{limit}}"
