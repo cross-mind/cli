@@ -1,0 +1,20 @@
+# Stack Overflow search questions by keyword
+url: "https://api.stackexchange.com/2.3/search?order=desc&sort=relevance&intitle={{query}}&site=stackoverflow&pagesize={{limit}}&filter=default"
+paginate:
+  type: offset
+  limit: "{{limit}}"
+  pageSize: 30
+responseRoot: "items"
+map:
+  rank: _index
+  title: title
+  url: link
+  score: score
+  answers: answer_count
+  views: view_count
+  author: owner.display_name
+  tags: tags
+  is_answered: is_answered
+  created: creation_date
+template: "{rank}. score:{score} answers:{answers} views:{views} answered:{is_answered} {title} {url}"
+sort: "score desc"

@@ -1,0 +1,36 @@
+{
+  "name": "crossmind",
+  "version": "0.1.0",
+  "description": "AI Agent-native CLI for 15 social platforms. Token-efficient output, multi-account, built-in safety policies.",
+  "type": "module",
+  "main": "dist/main.js",
+  "bin": {
+    "crossmind": "./dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node --esm src/main.ts",
+    "start": "node dist/main.js",
+    "lint": "eslint src --ext .ts",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "undici": "^6.19.2",
+    "chalk": "^5.3.0",
+    "open": "^10.1.0",
+    "yaml": "^2.4.5",
+    "keytar": "^7.9.0",
+    "playwright": "^1.44.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "typescript": "^5.4.5",
+    "ts-node": "^10.9.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": ["cli", "social", "agent", "ai", "twitter", "reddit", "github"],
+  "license": "MIT"
+}

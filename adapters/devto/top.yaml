@@ -1,0 +1,18 @@
+# DEV.to top articles (most reactions, past week)
+url: "https://dev.to/api/articles?top=7&per_page={{limit}}"
+paginate:
+  type: offset
+  limit: "{{limit}}"
+  pageSize: 30
+responseRoot: ""
+map:
+  rank: _index
+  title: title
+  url: url
+  score: positive_reactions_count
+  comments: comments_count
+  author: user.username
+  tags: tag_list
+  published_at: published_at
+template: "{rank}. score:{score} comments:{comments} {title} {url}"
+sort: "score desc"

@@ -1,0 +1,18 @@
+# Stack Overflow trending questions (most active today)
+url: "https://api.stackexchange.com/2.3/questions?order=desc&sort=activity&site=stackoverflow&pagesize={{limit}}&filter=default&fromdate={{today}}"
+paginate:
+  type: offset
+  limit: "{{limit}}"
+  pageSize: 30
+responseRoot: "items"
+map:
+  rank: _index
+  title: title
+  url: link
+  score: score
+  answers: answer_count
+  views: view_count
+  author: owner.display_name
+  tags: tags
+  created: creation_date
+template: "{rank}. score:{score} answers:{answers} views:{views} {title} {url}"

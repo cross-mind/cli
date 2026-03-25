@@ -1,0 +1,16 @@
+# Hacker News Show HN posts
+url: "https://hacker-news.firebaseio.com/v0/showstories.json"
+paginate:
+  type: ids
+  limit: "{{limit}}"
+  itemUrl: "https://hacker-news.firebaseio.com/v0/item/{{id}}.json"
+map:
+  rank: _index
+  title: title
+  url: url
+  score: score
+  comments: descendants
+  author: by
+  id: id
+template: "{rank}. score:{score} comments:{comments} {title} {url}"
+sort: "score desc"

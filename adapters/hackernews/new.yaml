@@ -1,0 +1,17 @@
+# Hacker News new stories
+url: "https://hacker-news.firebaseio.com/v0/newstories.json"
+paginate:
+  type: ids
+  limit: "{{limit}}"
+  itemUrl: "https://hacker-news.firebaseio.com/v0/item/{{id}}.json"
+filter:
+  type: story
+map:
+  rank: _index
+  title: title
+  url: url
+  score: score
+  comments: descendants
+  author: by
+  id: id
+template: "{rank}. score:{score} comments:{comments} {title} {url}"
