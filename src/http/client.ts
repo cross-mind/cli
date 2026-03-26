@@ -79,7 +79,12 @@ export async function request<T = unknown>(
       }
 
       if (res.status === 401 || res.status === 403) {
-        throw new AuthError(`HTTP ${res.status} from ${url}`);
+        let detail = '';
+        try {
+          const text = await res.text();
+          if (text) detail = ` — ${text.slice(0, 300)}`;
+        } catch { /* ignore read errors */ }
+        throw new AuthError(`HTTP ${res.status} from ${url}${detail}`);
       }
 
       if (res.status >= 500 && attempt < retries) {

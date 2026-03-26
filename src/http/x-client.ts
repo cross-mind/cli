@@ -116,7 +116,10 @@ export async function xRequest<T = unknown>(
   try {
     return await request<T>(url, { ...rest, headers });
   } catch (err) {
-    if (err instanceof AuthError && /HTTP (401|403)/.test(err.message)) {
+    // Only remap 401 as an auth guidance error.
+    // 403 from Twitter often means a policy/permission denial (e.g. Free tier reply restriction),
+    // not a missing token — surface the actual API message instead of a misleading auth hint.
+    if (err instanceof AuthError && /HTTP 401/.test(err.message)) {
       throw new AuthError(
         'X OAuth token missing or expired.\n' +
         '  Set X_ACCESS_TOKEN, or run: crossmind auth login x --access-token <token>\n' +
