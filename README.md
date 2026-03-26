@@ -105,8 +105,8 @@ X auth follows a priority chain:
 | Env var              | Maps to      | Use case                            |
 |----------------------|--------------|-------------------------------------|
 | `X_ACCESS_TOKEN`     | `accessToken`| OAuth 2.0 token from crossmind.io or manual PKCE flow |
-| `TWITTER_AUTH_TOKEN` | `authToken`  | Cookie extracted from browser       |
-| `TWITTER_CT0`        | `ct0`        | CSRF token paired with auth_token   |
+| `X_AUTH_TOKEN` | `authToken`  | Cookie extracted from browser       |
+| `X_CT0`        | `ct0`        | CSRF token paired with auth_token   |
 
 If `X_ACCESS_TOKEN` is missing or expired, commands that require OAuth will exit with:
 ```
@@ -404,7 +404,7 @@ crossmind x home
     │
     ├─ loadXCredentials()
     │   ├─ reads ~/.crossmind/accounts/x/<name>.json
-    │   └─ merges env vars (X_ACCESS_TOKEN, TWITTER_AUTH_TOKEN, TWITTER_CT0)
+    │   └─ merges env vars (X_ACCESS_TOKEN, X_AUTH_TOKEN, X_CT0)
     │
     ├─ hasCookieAuth? (authToken + ct0)
     │   └─ YES → twitter-cli bridge (Python curl_cffi, Chrome TLS)

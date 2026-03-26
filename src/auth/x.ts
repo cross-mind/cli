@@ -133,8 +133,8 @@ export async function loadXCredentials(
   const cred = await loadCredential('x', name, dataDir);
 
   const merged = {
-    authToken:   cred?.authToken   ?? process.env['TWITTER_AUTH_TOKEN'],
-    ct0:         cred?.ct0         ?? process.env['TWITTER_CT0'],
+    authToken:   cred?.authToken   ?? process.env['X_AUTH_TOKEN'],
+    ct0:         cred?.ct0         ?? process.env['X_CT0'],
     accessToken: cred?.accessToken ?? process.env['X_ACCESS_TOKEN'],
     bearerToken: cred?.bearerToken,
   };
