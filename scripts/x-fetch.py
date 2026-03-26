@@ -33,13 +33,21 @@ import sys
 import urllib.parse
 from typing import Any, Dict, List, Optional
 
-# ── curl_cffi import ────────────────────────────────────────────────────────
+# ── curl_cffi import (auto-install on first use) ────────────────────────────
 
 try:
     from curl_cffi import requests as cffi_requests
 except ImportError:
-    _out(False, None, "curl_cffi not installed. Run: uv pip install curl_cffi")
-    sys.exit(1)
+    import subprocess
+    # Try uv first (faster, preferred); fall back to the stdlib pip module
+    try:
+        subprocess.check_call(['uv', 'pip', 'install', 'curl_cffi', '-q'], stderr=sys.stderr)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        subprocess.check_call(
+            [sys.executable, '-m', 'pip', 'install', 'curl_cffi', '-q'],
+            stderr=sys.stderr,
+        )
+    from curl_cffi import requests as cffi_requests
 
 
 def _out(ok: bool, data: Any, error_msg: Optional[str] = None) -> None:
