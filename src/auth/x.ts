@@ -118,9 +118,9 @@ export async function saveBearerToken(
  * File-stored credentials take priority; env vars fill in any gaps.
  *
  * Env var overrides:
- *   TWITTER_AUTH_TOKEN  → authToken (cookie)
- *   TWITTER_CT0         → ct0 (cookie CSRF)
- *   X_ACCESS_TOKEN      → accessToken (OAuth PKCE user token)
+ *   X_AUTH_TOKEN   → authToken (cookie)
+ *   X_CT0          → ct0 (cookie CSRF)
+ *   X_ACCESS_TOKEN → accessToken (OAuth PKCE user token)
  *
  * This means CrossMind-injected OAuth tokens are picked up automatically
  * without needing to write them to the credential file.
@@ -133,10 +133,8 @@ export async function loadXCredentials(
   const cred = await loadCredential('x', name, dataDir);
 
   const merged = {
-    // Accept both X_* (current) and TWITTER_* (legacy vault names) as env var sources.
-    // CrossMind vault injects TWITTER_AUTH_TOKEN / TWITTER_CT0; both names are honoured.
-    authToken:   cred?.authToken   ?? process.env['X_AUTH_TOKEN']   ?? process.env['TWITTER_AUTH_TOKEN'],
-    ct0:         cred?.ct0         ?? process.env['X_CT0']          ?? process.env['TWITTER_CT0'],
+    authToken:   cred?.authToken   ?? process.env['X_AUTH_TOKEN'],
+    ct0:         cred?.ct0         ?? process.env['X_CT0'],
     accessToken: cred?.accessToken ?? process.env['X_ACCESS_TOKEN'],
     bearerToken: cred?.bearerToken,
   };

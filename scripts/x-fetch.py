@@ -61,9 +61,8 @@ def _out(ok: bool, data: Any, error_msg: Optional[str] = None) -> None:
 
 # ── Credentials ─────────────────────────────────────────────────────────────
 
-# Accept both X_* (current) and TWITTER_* (legacy vault names).
-AUTH_TOKEN = os.environ.get("X_AUTH_TOKEN") or os.environ.get("TWITTER_AUTH_TOKEN", "")
-CT0 = os.environ.get("X_CT0") or os.environ.get("TWITTER_CT0", "")
+AUTH_TOKEN = os.environ.get("X_AUTH_TOKEN", "")
+CT0 = os.environ.get("X_CT0", "")
 
 BEARER = (
     "AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs"

@@ -1,73 +1,210 @@
 /**
  * Cookie extraction helper using Playwright.
- * Launches a browser, navigates to a login page,
- * and extracts session cookies after the user logs in.
+ *
+ * Two modes:
+ *   1. Headless (default) — reuses an existing persistent browser profile.
+ *      Extracts cookies silently if the session is still valid.
+ *      Fails fast (throws ExtractCookieLoginRequired) when not logged in.
+ *   2. Headed — opens a visible browser window for first-time / re-login.
+ *      Waits for the user to complete login, then saves cookies.
+ *
+ * Profile directory: ~/.config/crossmind/browser-profiles/<platform>/
+ * Keeping a persistent profile means the user only needs to log in once;
+ * subsequent headless runs reuse the saved session.
  */
 
 import { chromium } from 'playwright';
+import os from 'os';
+import path from 'path';
+import fs from 'fs';
 import { saveCredential } from './store.js';
+
+/**
+ * Locate a usable Chrome/Chromium executable.
+ * Prefers system Chrome to avoid large Playwright browser downloads.
+ */
+function findChrome(): string | undefined {
+  const candidates = [
+    process.env['CHROME_PATH'],
+    '/opt/google/chrome/chrome',
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+  ];
+  for (const p of candidates) {
+    if (p && fs.existsSync(p)) return p;
+  }
+  return undefined; // Fall back to Playwright's bundled browser
+}
 
 export interface CookieTarget {
   platform: string;
   loginUrl: string;
   /** Cookie names to extract */
   cookieNames: string[];
-  /** Detection: URL or path that indicates successful login */
+  /** URL or path that indicates successful login */
   successUrlPattern?: RegExp;
+  /** URL pattern that indicates we are still on the login/auth page */
+  loginUrlPattern?: RegExp;
 }
 
 export const COOKIE_TARGETS: Record<string, CookieTarget> = {
   x: {
     platform: 'x',
-    loginUrl: 'https://twitter.com/login',
+    loginUrl: 'https://x.com/login',
     cookieNames: ['auth_token', 'ct0'],
-    successUrlPattern: /twitter\.com\/(home|[a-z_]+\/status)/,
+    successUrlPattern: /(twitter|x)\.com\/(home|[a-z_]+\/status)/,
+    loginUrlPattern: /(twitter|x)\.com\/(login|i\/flow|oauth)/,
   },
   instagram: {
     platform: 'instagram',
     loginUrl: 'https://www.instagram.com/accounts/login/',
     cookieNames: ['sessionid', 'csrftoken'],
     successUrlPattern: /instagram\.com\/(?!accounts)/,
+    loginUrlPattern: /instagram\.com\/accounts\/login/,
   },
   linkedin: {
     platform: 'linkedin',
     loginUrl: 'https://www.linkedin.com/login',
     cookieNames: ['li_at', 'JSESSIONID'],
     successUrlPattern: /linkedin\.com\/feed/,
+    loginUrlPattern: /linkedin\.com\/(login|checkpoint|authwall)/,
   },
   reddit: {
     platform: 'reddit',
     loginUrl: 'https://www.reddit.com/login',
-    // reddit_session (older accounts) or token_v2 (newer OAuth-based sessions)
     cookieNames: ['reddit_session', 'token_v2'],
     successUrlPattern: /reddit\.com\/(home|user\/|r\/|saved)/,
+    loginUrlPattern: /reddit\.com\/login/,
   },
 };
 
 /**
- * Launch Playwright browser, let user log in manually,
- * extract and save the session cookies.
+ * Thrown when the browser is not logged in and headed mode is needed.
+ * Callers that run autonomously can catch this and trigger a browser takeover.
+ */
+export class ExtractCookieLoginRequired extends Error {
+  constructor(public readonly platformKey: string) {
+    super(
+      `Not logged in to ${platformKey}. ` +
+      'Run "crossmind auth extract-cookie ' + platformKey + ' --headed" to open a browser window and log in.'
+    );
+    this.name = 'ExtractCookieLoginRequired';
+  }
+}
+
+/**
+ * Returns the persistent browser profile directory for a platform.
+ * Creates the directory if it does not exist.
+ */
+function profileDir(platformKey: string): string {
+  const dir = path.join(os.homedir(), '.config', 'crossmind', 'browser-profiles', platformKey);
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+/**
+ * Extract and save session cookies for a platform.
+ *
+ * @param platformKey  - Platform key (x, instagram, linkedin, reddit)
+ * @param accountName  - Account name to save under
+ * @param dataDir      - Optional credential store directory
+ * @param headed       - When true, open a visible browser for manual login.
+ *                       When false (default), fail fast if not logged in.
  */
 export async function extractAndSaveCookies(
   platformKey: string,
   accountName: string,
-  dataDir?: string
+  dataDir?: string,
+  headed = false,
 ): Promise<void> {
   const target = COOKIE_TARGETS[platformKey];
   if (!target) {
-    throw new Error(`No cookie target defined for platform "${platformKey}". Available: ${Object.keys(COOKIE_TARGETS).join(', ')}`);
+    throw new Error(
+      `No cookie target defined for platform "${platformKey}". ` +
+      `Available: ${Object.keys(COOKIE_TARGETS).join(', ')}`
+    );
   }
 
-  console.log(`Launching browser for ${platformKey} login...`);
+  const profile = profileDir(platformKey);
+
+  if (headed) {
+    await extractHeaded(target, accountName, dataDir, profile);
+  } else {
+    await extractHeadless(target, accountName, dataDir, profile);
+  }
+}
+
+// ── Headless extraction (reuses existing session) ──────────────────────────
+
+async function extractHeadless(
+  target: CookieTarget,
+  accountName: string,
+  dataDir: string | undefined,
+  profile: string,
+): Promise<void> {
+  const executablePath = findChrome();
+  const context = await chromium.launchPersistentContext(profile, {
+    headless: true,
+    executablePath,
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+
+  try {
+    const page = await context.newPage();
+    await page.goto(target.loginUrl, { waitUntil: 'domcontentloaded', timeout: 15_000 });
+
+    // Wait briefly for any redirects
+    await page.waitForTimeout(3000);
+
+    const currentUrl = page.url();
+
+    // If we end up on a login page, the session has expired
+    if (target.loginUrlPattern && target.loginUrlPattern.test(currentUrl)) {
+      throw new ExtractCookieLoginRequired(target.platform);
+    }
+
+    // If no successUrlPattern is defined, just try to grab cookies anyway
+    if (target.successUrlPattern && !target.successUrlPattern.test(currentUrl)) {
+      // Could be an intermediate page — wait a bit more
+      await page.waitForTimeout(3000);
+      const urlAfterWait = page.url();
+      if (target.loginUrlPattern && target.loginUrlPattern.test(urlAfterWait)) {
+        throw new ExtractCookieLoginRequired(target.platform);
+      }
+    }
+
+    const cookies = await context.cookies();
+    await savePlatformCookies(target, accountName, dataDir, cookies);
+  } finally {
+    await context.close();
+  }
+}
+
+// ── Headed extraction (manual login flow) ──────────────────────────────────
+
+async function extractHeaded(
+  target: CookieTarget,
+  accountName: string,
+  dataDir: string | undefined,
+  profile: string,
+): Promise<void> {
+  console.log(`Launching browser for ${target.platform} login...`);
   console.log(`Please log in when the browser opens. The session will be saved automatically.`);
+  console.log(`Profile directory: ${profile}`);
 
-  const browser = await chromium.launch({ headless: false });
-  const context = await browser.newContext();
+  const executablePath = findChrome();
+  const context = await chromium.launchPersistentContext(profile, {
+    headless: false,
+    executablePath,
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+
   const page = await context.newPage();
-
   await page.goto(target.loginUrl);
 
-  // Wait for the user to log in
+  // Wait for successful login
   await new Promise<void>((resolve, reject) => {
     const interval = setInterval(async () => {
       try {
@@ -82,7 +219,7 @@ export async function extractAndSaveCookies(
       }
     }, 2000);
 
-    // Also resolve after 5 minutes if pattern never matches
+    // Resolve after 5 minutes regardless
     setTimeout(() => {
       clearInterval(interval);
       resolve();
@@ -90,22 +227,32 @@ export async function extractAndSaveCookies(
   });
 
   const cookies = await context.cookies();
-  const extracted: Record<string, string> = {};
+  await savePlatformCookies(target, accountName, dataDir, cookies);
+  await context.close();
+}
 
+// ── Save cookies by platform ───────────────────────────────────────────────
+
+async function savePlatformCookies(
+  target: CookieTarget,
+  accountName: string,
+  dataDir: string | undefined,
+  cookies: Array<{ name: string; value: string }>,
+): Promise<void> {
+  const extracted: Record<string, string> = {};
   for (const name of target.cookieNames) {
     const cookie = cookies.find((c) => c.name === name);
-    if (cookie) {
-      extracted[name] = cookie.value;
-    }
+    if (cookie) extracted[name] = cookie.value;
   }
-
-  await browser.close();
 
   if (Object.keys(extracted).length === 0) {
-    throw new Error(`No session cookies found for ${platformKey}. Please ensure you completed login.`);
+    throw new Error(
+      `No session cookies found for ${target.platform}. Please ensure you completed login.`
+    );
   }
 
-  // Save according to platform
+  const platformKey = target.platform;
+
   if (platformKey === 'x') {
     await saveCredential({
       platform: 'x',
@@ -124,10 +271,9 @@ export async function extractAndSaveCookies(
       platform: 'linkedin',
       name: accountName,
       cookie: `li_at=${extracted['li_at']}; JSESSIONID=${extracted['JSESSIONID']}`,
-      ct0: extracted['JSESSIONID'], // Used as CSRF token
+      ct0: extracted['JSESSIONID'],
     }, dataDir);
   } else if (platformKey === 'reddit') {
-    // Prefer reddit_session; fall back to token_v2 (newer OAuth-based sessions)
     const session = extracted['reddit_session'] ?? extracted['token_v2'];
     if (!session) throw new Error('No Reddit session cookie found after login.');
     await saveCredential({
