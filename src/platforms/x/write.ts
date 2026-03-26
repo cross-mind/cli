@@ -1,7 +1,11 @@
 /**
  * X (Twitter) write operations.
  * Post, reply, like, retweet, follow, dm, delete.
- * All require auth_token + ct0 cookie credentials.
+ *
+ * Auth strategy:
+ *   - OAuth access token (X_ACCESS_TOKEN or stored accessToken) → v2 REST write ops
+ *   - Cookie auth (authToken + ct0)  → bridge-based ops (bookmark, unbookmark)
+ *   Either credential type satisfies getXCreds; specific ops check what they need.
  */
 
 import { xRequest } from '../../http/x-client.js';
@@ -14,12 +18,24 @@ import {
   bridgeUnbookmark,
 } from '../../http/x-bridge.js';
 
+/** Load and validate X credentials. Accepts OAuth OR cookie auth. */
 async function getXCreds(account?: string, dataDir?: string) {
   const creds = await loadXCredentials(account, dataDir);
-  if (!creds?.authToken || !creds?.ct0) {
-    throw new AuthError('X write operations require cookie auth. Run: crossmind auth login x --auth-token <token> --ct0 <ct0>');
+  if (!creds?.accessToken && (!creds?.authToken || !creds?.ct0)) {
+    throw new AuthError(
+      'X write operations require OAuth. Set X_ACCESS_TOKEN or run: crossmind auth login x'
+    );
   }
-  return { authToken: creds.authToken, ct0: creds.ct0 };
+  return creds!;
+}
+
+/** Assert cookie credentials are present (required for bridge write ops). */
+function requireCookie(creds: { authToken?: string; ct0?: string }): void {
+  if (!creds.authToken || !creds.ct0) {
+    throw new AuthError(
+      'This operation requires X cookie auth. Run: crossmind auth login x --auth-token <token> --ct0 <ct0>'
+    );
+  }
 }
 
 export interface WriteResult {
@@ -296,10 +312,11 @@ export async function bookmarkTweet(
   dataDir?: string
 ): Promise<WriteResult> {
   const creds = await getXCreds(account, dataDir);
+  requireCookie(creds);
   if (!await isTwitterCliAvailable()) {
     throw new Error('Bookmarks require twitter-cli. Install: uvx install twitter-cli');
   }
-  await bridgeBookmark(tweetId, creds);
+  await bridgeBookmark(tweetId, creds as { authToken: string; ct0: string });
   return { success: true, message: `bookmarked:${tweetId}` };
 }
 
@@ -310,9 +327,10 @@ export async function unbookmarkTweet(
   dataDir?: string
 ): Promise<WriteResult> {
   const creds = await getXCreds(account, dataDir);
+  requireCookie(creds);
   if (!await isTwitterCliAvailable()) {
     throw new Error('Bookmarks require twitter-cli. Install: uvx install twitter-cli');
   }
-  await bridgeUnbookmark(tweetId, creds);
+  await bridgeUnbookmark(tweetId, creds as { authToken: string; ct0: string });
   return { success: true, message: `unbookmarked:${tweetId}` };
 }

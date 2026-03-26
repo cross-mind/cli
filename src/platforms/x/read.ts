@@ -402,6 +402,9 @@ export async function getLikes(
   dataDir?: string
 ): Promise<XTweet[]> {
   const creds = await loadXCredentials(account, dataDir);
+  if (!creds?.accessToken) {
+    throw new AuthError('Likes require OAuth. Set X_ACCESS_TOKEN or run: crossmind auth login x');
+  }
   const userResp = await xRequest<{ data: { id: string } }>(
     `/2/users/by/username/${username}`,
     { creds: creds ?? undefined }

@@ -103,6 +103,8 @@ function buildGqlHeaders(creds: XCredentials): Record<string, string> {
  * - With creds.authToken+ct0: not used here (use xGqlGet instead)
  * - With creds.bearerToken or creds.accessToken: token auth
  * - Without creds: public bearer
+ *
+ * Translates generic 401/403 HTTP errors into actionable X OAuth guidance.
  */
 export async function xRequest<T = unknown>(
   path: string,
@@ -111,7 +113,16 @@ export async function xRequest<T = unknown>(
   const { creds, ...rest } = opts;
   const url = path.startsWith('http') ? path : `${X_API_BASE}${path}`;
   const headers = { ...buildRestHeaders(creds), ...(rest.headers ?? {}) };
-  return request<T>(url, { ...rest, headers });
+  try {
+    return await request<T>(url, { ...rest, headers });
+  } catch (err) {
+    if (err instanceof AuthError && /HTTP (401|403)/.test(err.message)) {
+      throw new AuthError(
+        'X OAuth token missing or expired. Set X_ACCESS_TOKEN or run: crossmind auth login x'
+      );
+    }
+    throw err;
+  }
 }
 
 /**

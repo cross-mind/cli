@@ -1,14 +1,20 @@
 # crossmind
 
-Agent-native CLI for 15 social platforms. Compact, parseable output by default. JSON mode for structured pipelines.
-
-## Install
+Agent-native CLI for 15 social platforms. Token-efficient output, multi-account, built-in safety policies.
 
 ```bash
 npm install -g crossmind
-# or
-pnpm add -g crossmind
 ```
+
+## Why crossmind
+
+Most social CLIs are built for humans. crossmind is built for AI agents:
+
+- **~85% token reduction** vs raw API JSON responses — same information, far less context
+- **No-auth first** — public platforms work out of the box, no configuration required
+- **Compact output by default** — single-line `key:value` format, no emoji, no decorative whitespace
+- **`--json` for structured pipelines** — clean arrays with no outer wrapper
+- **Built-in write safety** — daily limits, random jitter delays, exponential backoff
 
 ## Quick Start
 
@@ -19,15 +25,15 @@ crossmind reddit r MachineLearning 25 --sort top --time week
 crossmind gh trending --lang typescript
 crossmind arxiv search "transformer architecture" --cat cs.AI 10
 
-# Authenticate for write access
-crossmind auth login x --auth-token <token> --ct0 <ct0>
+# X (Twitter) — set OAuth token or cookie auth
+export X_ACCESS_TOKEN=<your_oauth_token>
+crossmind x home 10
+crossmind x post "Hello from crossmind"
+
+# Or authenticate interactively
+crossmind auth login x
 crossmind auth login reddit
 crossmind auth login bsky --handle user.bsky.social --app-password <password>
-
-# Write operations
-crossmind x post "Hello from crossmind"
-crossmind reddit comment t3_abc123 "Great post!"
-crossmind bsky post "Testing crossmind CLI"
 ```
 
 ## Output Format
@@ -45,39 +51,68 @@ Add `--json` for structured output:
 crossmind hn top 5 --json
 ```
 
+```json
+[
+  { "rank": 1, "score": 342, "comments": 87, "title": "Show HN: ...", "url": "https://..." }
+]
+```
+
 ## Platforms
 
-| Command   | Platform        | Auth         | Read | Write |
-|-----------|-----------------|--------------|------|-------|
-| `hn`      | Hacker News     | None         | Yes  | No    |
-| `lb`      | Lobsters        | None         | Yes  | No    |
-| `dev`     | DEV.to          | None         | Yes  | No    |
-| `so`      | Stack Overflow  | None         | Yes  | No    |
-| `arxiv`   | arXiv           | None         | Yes  | No    |
-| `gh`      | GitHub          | Optional PAT | Yes  | No    |
-| `ph`      | Product Hunt    | API key      | Yes  | No    |
-| `x`       | X (Twitter)     | Cookie/OAuth | Yes  | Yes   |
-| `reddit`  | Reddit          | OAuth PKCE   | Yes  | Yes   |
-| `bsky`    | Bluesky         | App password | Yes  | Yes   |
-| `yt`      | YouTube         | API key      | Yes  | No    |
-| `med`     | Medium          | None (RSS)   | Yes  | No    |
-| `sub`     | Substack        | None (RSS)   | Yes  | No    |
-| `ig`      | Instagram       | Cookie       | Yes  | No    |
-| `li`      | LinkedIn        | Cookie       | Yes  | No    |
+| Command   | Platform        | Auth                    | Read | Write |
+|-----------|-----------------|-------------------------|------|-------|
+| `hn`      | Hacker News     | None                    | Yes  | No    |
+| `lb`      | Lobsters        | None                    | Yes  | No    |
+| `dev`     | DEV.to          | None                    | Yes  | No    |
+| `so`      | Stack Overflow  | None                    | Yes  | No    |
+| `arxiv`   | arXiv           | None                    | Yes  | No    |
+| `gh`      | GitHub          | Optional PAT            | Yes  | No    |
+| `ph`      | Product Hunt    | API key                 | Yes  | No    |
+| `x`       | X (Twitter)     | Cookie / OAuth 2.0 PKCE | Yes  | Yes   |
+| `reddit`  | Reddit          | OAuth 2.0 PKCE          | Yes  | Yes   |
+| `bsky`    | Bluesky         | App password            | Yes  | Yes   |
+| `yt`      | YouTube         | API key                 | Yes  | No    |
+| `med`     | Medium          | None (RSS)              | Yes  | No    |
+| `sub`     | Substack        | None (RSS)              | Yes  | No    |
+| `ig`      | Instagram       | Cookie                  | Yes  | No    |
+| `li`      | LinkedIn        | Cookie                  | Yes  | No    |
 
 ## Authentication
 
-### X (Twitter)
+### X (Twitter) — How it works
 
-**Cookie auth** (for reads + writes via cookie session):
+X auth follows a priority chain:
+
+1. **Cookie auth** (`auth_token` + `ct0`) — routes through the twitter-cli bridge, which uses `curl_cffi` Chrome TLS fingerprint impersonation. Enables full read access including home feed, bookmarks, and DM history.
+2. **OAuth 2.0 token** (`X_ACCESS_TOKEN` or stored `accessToken`) — standard v2 REST API. Required for write operations (post, like, retweet, follow, DM send) and for reading likes.
+3. **Public bearer** — no config needed. Supports search only.
+
+**Env var overrides** (highest priority, checked before credential file):
+
+| Env var              | Maps to      | Use case                            |
+|----------------------|--------------|-------------------------------------|
+| `X_ACCESS_TOKEN`     | `accessToken`| OAuth 2.0 token from crossmind.io or manual PKCE flow |
+| `TWITTER_AUTH_TOKEN` | `authToken`  | Cookie extracted from browser       |
+| `TWITTER_CT0`        | `ct0`        | CSRF token paired with auth_token   |
+
+If `X_ACCESS_TOKEN` is missing or expired, commands that require OAuth will exit with:
+```
+Error: X OAuth token missing or expired. Set X_ACCESS_TOKEN or run: crossmind auth login x
+```
+
+**Cookie auth** (manual extraction from browser):
 ```bash
 crossmind auth login x --auth-token <auth_token> --ct0 <ct0>
-```
-Get cookies from browser DevTools → Application → Cookies → twitter.com
+# Get from browser DevTools → Application → Cookies → twitter.com
 
-**Or use browser extraction:**
-```bash
+# Or use automated extraction:
 crossmind extract-cookie x
+```
+
+**OAuth 2.0 PKCE** (opens browser):
+```bash
+export X_CLIENT_ID=your_app_client_id
+crossmind auth login x
 ```
 
 ### Reddit
@@ -97,7 +132,7 @@ crossmind auth login bsky --handle yourhandle.bsky.social --app-password xxxx-xx
 
 ### GitHub
 
-Personal access token:
+Personal access token (optional, increases rate limit from 60 → 5000 req/hr):
 ```bash
 crossmind auth login gh --token ghp_xxxxxxxxxxxx
 ```
@@ -167,9 +202,9 @@ Categories: `cs.AI`, `cs.LG`, `cs.CL`, `cs.CV`, `stat.ML`, `math.OC`, etc.
 
 ```bash
 crossmind gh search <query> [limit] --sort stars    # Search repos
-crossmind gh trending [limit] --lang python          # Trending repos
-crossmind gh issues <owner/repo> [limit]             # List issues
-crossmind gh releases <owner/repo> [limit]           # List releases
+crossmind gh trending [limit] --lang python         # Trending repos
+crossmind gh issues <owner/repo> [limit]            # List issues
+crossmind gh releases <owner/repo> [limit]          # List releases
 ```
 
 ### Product Hunt (`ph`)
@@ -182,37 +217,64 @@ crossmind ph search <query> [limit]           # Search products
 ### X / Twitter (`x`)
 
 ```bash
-# Read
-crossmind x search <query> [limit]           # Search recent tweets
-crossmind x timeline <username> [limit]      # User timeline
-crossmind x home [limit]                     # Home feed (auth required)
-crossmind x profile <username>               # User profile
+# Read (cookie auth preferred, falls back to v2 REST)
+crossmind x search <query> [limit]              # Search recent tweets
+crossmind x timeline <username> [limit]         # User timeline
+crossmind x home [limit]                        # Home feed (auth required)
+crossmind x profile <username>                  # User profile
+crossmind x tweet <tweet_id> [limit]            # Tweet + reply thread
+crossmind x followers <username> [limit]        # User's followers
+crossmind x following <username> [limit]        # Accounts user follows
+crossmind x bookmarks [limit]                   # Your bookmarks (cookie)
+crossmind x list <list_id> [limit]              # Tweets from a List
+crossmind x likes <username> [limit]            # User's liked tweets (OAuth)
+crossmind x dm-list [limit]                     # Recent DM events (OAuth)
+crossmind x dm-conversation <username> [limit]  # DM history with user (OAuth)
 
-# Write (requires auth)
+# Write (OAuth required)
 crossmind x post <text>
 crossmind x reply <tweet_id> <text>
 crossmind x like <tweet_id>
+crossmind x unlike <tweet_id>
 crossmind x retweet <tweet_id>
+crossmind x unretweet <tweet_id>
+crossmind x quote <tweet_id> <text>
 crossmind x follow <username>
+crossmind x unfollow <username>
 crossmind x dm <username> <text>
 crossmind x delete <tweet_id>
+crossmind x bookmark <tweet_id>     # cookie + twitter-cli required
+crossmind x unbookmark <tweet_id>   # cookie + twitter-cli required
 ```
 
 ### Reddit (`reddit`)
 
 ```bash
-# Read
+# Read (public API — no auth required)
 crossmind reddit r <subreddit> [limit] --sort hot --time day
 crossmind reddit search <query> [limit] --sub MachineLearning
 crossmind reddit comments <subreddit> <post_id> [limit]
+crossmind reddit popular [limit]                 # r/popular feed
+crossmind reddit all [limit]                     # r/all feed
+crossmind reddit sub-info <subreddit>            # Subreddit metadata
+crossmind reddit user <username>                 # User profile
+crossmind reddit user-posts <username> [limit]   # User's posts
+crossmind reddit user-comments <username> [limit] # User's comments
+crossmind reddit read <post_id>                  # Post + top comments
 
-# Write (requires OAuth)
-crossmind reddit comment <parent_id> <text>   # parent_id: t3_xxx or t1_xxx
-crossmind reddit upvote <id>                   # fullname: t3_xxx or t1_xxx
+# Read (OAuth required)
+crossmind reddit home [limit]                    # Your front page
+crossmind reddit saved [limit]                   # Your saved posts
+
+# Write (OAuth required)
+crossmind reddit comment <parent_id> <text>      # parent_id: t3_xxx or t1_xxx
+crossmind reddit upvote <id>
 crossmind reddit downvote <id>
 crossmind reddit save <id>
 crossmind reddit subscribe <subreddit>
-crossmind reddit post <subreddit> <title> <url>
+crossmind reddit post <subreddit> <title> <url>       # Link post
+crossmind reddit text-post <subreddit> <title> <text>  # Text post
+crossmind reddit crosspost <target_sub> <post_id>
 ```
 
 ### Bluesky (`bsky`)
@@ -312,15 +374,54 @@ export CROSSMIND_DATA_DIR=/path/to/data
 
 ## Safety Policies
 
-- Daily write limits enforced per platform and action type
-- Random jitter delay (1.5–4s) between write operations
-- Exponential backoff on rate limit errors (429)
-- No writes without explicit commands — reads are always safe
+Write operations have multi-layer protection to prevent account bans:
+
+| Protection       | Details                                                    |
+|------------------|------------------------------------------------------------|
+| Daily limits     | Per-operation caps (post: 10/day, reply: 30, like: 100)    |
+| Random jitter    | 1.5–4s random delay between write ops                      |
+| Exponential backoff | Auto-retry with backoff on 429 rate limit responses     |
+| OAuth writes     | All writes use official OAuth API paths, not UI simulation |
+| Revocable tokens | OAuth tokens can be revoked independently from the account |
+
+## How X Auth Works Internally
+
+```
+crossmind x home
+    │
+    ├─ loadXCredentials()
+    │   ├─ reads ~/.crossmind/accounts/x/<name>.json
+    │   └─ merges env vars (X_ACCESS_TOKEN, TWITTER_AUTH_TOKEN, TWITTER_CT0)
+    │
+    ├─ hasCookieAuth? (authToken + ct0)
+    │   └─ YES → twitter-cli bridge (Python curl_cffi, Chrome TLS)
+    │              └─ x.com/i/api/graphql (GraphQL, full feed)
+    │
+    └─ accessToken? (OAuth)
+        └─ YES → xRequest() → api.twitter.com/2/timelines/home
+        └─ NO  → error: "Set X_ACCESS_TOKEN or run: crossmind auth login x"
+```
+
+The twitter-cli bridge (`uvx install twitter-cli`) handles X's Chrome TLS fingerprint check. Without it, Node.js's native `fetch()` is rejected by X's bot detection. When the bridge is unavailable, the CLI falls back to the v2 REST API.
+
+## Runtime Dependencies
+
+For X cookie-auth commands (home feed, bookmarks, DMs):
+```bash
+uv tool install twitter-cli
+# or: pip install twitter-cli
+```
+
+Verify:
+```bash
+crossmind auth status
+```
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 20+
 - pnpm or npm
+- For X cookie reads: `twitter-cli` (`uvx install twitter-cli`)
 
 ## License
 
