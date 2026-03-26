@@ -1,7 +1,7 @@
 /**
  * X (Twitter) platform commands.
- * Read: search, timeline, home, profile, tweet, followers, following, bookmarks, list, likes, dm-list, dm-conversation
- * Write: post, reply, like, unlike, retweet, unretweet, quote, follow, unfollow, bookmark, unbookmark, dm, delete
+ * Read: search, timeline, home, profile, thread, followers, following, bookmarks, list, likes, dm-list, dm-conversation
+ * Write: tweet, reply, like, unlike, retweet, unretweet, quote, follow, unfollow, bookmark, unbookmark, dm, delete
  */
 
 import { Command } from 'commander';
@@ -103,7 +103,7 @@ export function registerX(program: Command): void {
     });
 
   x
-    .command('tweet <tweet_id> [limit]')
+    .command('thread <tweet_id> [limit]')
     .description('Get a tweet and its reply thread')
     .option('--account <name>', 'Account to use')
     .option('--data-dir <dir>', 'Data directory override')
@@ -250,7 +250,7 @@ export function registerX(program: Command): void {
   // ── Write commands ─────────────────────────────────────────────
 
   x
-    .command('post <text>')
+    .command('tweet <text>')
     .description('Post a new tweet')
     .option('--account <name>', 'Account to use')
     .option('--data-dir <dir>', 'Data directory override')

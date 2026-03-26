@@ -41,7 +41,7 @@ crossmind arxiv search "transformer architecture" --cat cs.AI 10
 # X (Twitter) — set OAuth token or cookie auth
 export X_ACCESS_TOKEN=<your_oauth_token>
 crossmind x home 10
-crossmind x post "Hello from crossmind"
+crossmind x tweet "Hello from crossmind"
 
 # Or authenticate interactively
 crossmind auth login x
@@ -235,7 +235,7 @@ crossmind x search <query> [limit]              # Search recent tweets
 crossmind x timeline <username> [limit]         # User timeline
 crossmind x home [limit]                        # Home feed (auth required)
 crossmind x profile <username>                  # User profile
-crossmind x tweet <tweet_id> [limit]            # Tweet + reply thread
+crossmind x thread <tweet_id> [limit]           # Tweet + reply thread
 crossmind x followers <username> [limit]        # User's followers
 crossmind x following <username> [limit]        # Accounts user follows
 crossmind x bookmarks [limit]                   # Your bookmarks (cookie)
@@ -245,7 +245,7 @@ crossmind x dm-list [limit]                     # Recent DM events (OAuth)
 crossmind x dm-conversation <username> [limit]  # DM history with user (OAuth)
 
 # Write (OAuth required)
-crossmind x post <text>
+crossmind x tweet <text>
 crossmind x reply <tweet_id> <text>
 crossmind x like <tweet_id>
 crossmind x unlike <tweet_id>
@@ -364,7 +364,7 @@ crossmind auth login x work --auth-token <token1> --ct0 <ct0_1>
 crossmind auth login x personal --auth-token <token2> --ct0 <ct0_2>
 
 # Use a specific account
-crossmind x post "Work tweet" --account work
+crossmind x tweet "Work tweet" --account work
 crossmind x timeline elonmusk --account personal
 
 # Set default
@@ -377,7 +377,7 @@ Credentials and daily write limits are stored in `~/.crossmind/` by default.
 
 Override per-command:
 ```bash
-crossmind x post "hello" --data-dir /tmp/crossmind-test
+crossmind x tweet "hello" --data-dir /tmp/crossmind-test
 ```
 
 Or set globally:
