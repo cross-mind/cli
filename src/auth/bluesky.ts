@@ -7,6 +7,7 @@ import { saveCredential, loadCredential, resolveAccount } from './store.js';
 import { AuthError } from '../http/client.js';
 
 export const BSKY_API = 'https://bsky.social';
+export const BSKY_PUBLIC_API = 'https://api.bsky.app';
 const BSKY_PDS = `${BSKY_API}/xrpc`;
 
 export interface BskySession {
@@ -117,6 +118,21 @@ export async function getBskyToken(account?: string, dataDir?: string): Promise<
     did: cred.did ?? '',
     handle: cred.handle ?? '',
   };
+}
+
+/**
+ * Like getBskyToken, but returns null instead of throwing when no credentials.
+ * Use for read operations that support public API fallback.
+ */
+export async function tryGetBskyToken(
+  account?: string,
+  dataDir?: string
+): Promise<{ token: string; did: string; handle: string } | null> {
+  try {
+    return await getBskyToken(account, dataDir);
+  } catch {
+    return null;
+  }
 }
 
 /** Build headers for Bluesky API calls */

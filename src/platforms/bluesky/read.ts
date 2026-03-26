@@ -4,9 +4,10 @@
  */
 
 import { request } from '../../http/client.js';
-import { getBskyToken, bskyHeaders, BSKY_API } from '../../auth/bluesky.js';
+import { getBskyToken, tryGetBskyToken, bskyHeaders, BSKY_API, BSKY_PUBLIC_API } from '../../auth/bluesky.js';
 
 const BSKY_XRPC = `${BSKY_API}/xrpc`;
+const BSKY_PUBLIC_XRPC = `${BSKY_PUBLIC_API}/xrpc`;
 
 export interface BskyPost {
   rank: number;
@@ -74,53 +75,59 @@ export async function getTimeline(
   return (data.feed ?? []).slice(0, limit).map((item, i) => mapPost(item.post, i));
 }
 
-/** Search posts */
+/** Search posts — uses public API when no credentials are configured */
 export async function searchPosts(
   query: string,
   limit: number,
   account?: string,
   dataDir?: string
 ): Promise<BskyPost[]> {
-  const { token } = await getBskyToken(account, dataDir);
+  const session = await tryGetBskyToken(account, dataDir);
 
   const params = new URLSearchParams({ q: query, limit: String(Math.min(limit, 100)) });
+  const base = session ? BSKY_XRPC : BSKY_PUBLIC_XRPC;
+  const headers = session ? bskyHeaders(session.token) : {};
   const data = await request<{ posts: Record<string, unknown>[] }>(
-    `${BSKY_XRPC}/app.bsky.feed.searchPosts?${params}`,
-    { headers: bskyHeaders(token) }
+    `${base}/app.bsky.feed.searchPosts?${params}`,
+    { headers }
   );
 
   return (data.posts ?? []).slice(0, limit).map((post, i) => mapPost(post, i));
 }
 
-/** Get author feed */
+/** Get author feed — uses public API when no credentials are configured */
 export async function getAuthorFeed(
   handle: string,
   limit: number,
   account?: string,
   dataDir?: string
 ): Promise<BskyPost[]> {
-  const { token } = await getBskyToken(account, dataDir);
+  const session = await tryGetBskyToken(account, dataDir);
 
   const params = new URLSearchParams({ actor: handle, limit: String(Math.min(limit, 100)) });
+  const base = session ? BSKY_XRPC : BSKY_PUBLIC_XRPC;
+  const headers = session ? bskyHeaders(session.token) : {};
   const data = await request<{ feed: Array<{ post: Record<string, unknown> }> }>(
-    `${BSKY_XRPC}/app.bsky.feed.getAuthorFeed?${params}`,
-    { headers: bskyHeaders(token) }
+    `${base}/app.bsky.feed.getAuthorFeed?${params}`,
+    { headers }
   );
 
   return (data.feed ?? []).slice(0, limit).map((item, i) => mapPost(item.post, i));
 }
 
-/** Get a user profile */
+/** Get a user profile — uses public API when no credentials are configured */
 export async function getProfile(
   handle: string,
   account?: string,
   dataDir?: string
 ): Promise<BskyProfile | null> {
-  const { token } = await getBskyToken(account, dataDir);
+  const session = await tryGetBskyToken(account, dataDir);
 
+  const base = session ? BSKY_XRPC : BSKY_PUBLIC_XRPC;
+  const headers = session ? bskyHeaders(session.token) : {};
   const data = await request<Record<string, unknown>>(
-    `${BSKY_XRPC}/app.bsky.actor.getProfile?actor=${encodeURIComponent(handle)}`,
-    { headers: bskyHeaders(token) }
+    `${base}/app.bsky.actor.getProfile?actor=${encodeURIComponent(handle)}`,
+    { headers }
   );
 
   if (!data) return null;
