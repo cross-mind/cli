@@ -118,7 +118,10 @@ export async function xRequest<T = unknown>(
   } catch (err) {
     if (err instanceof AuthError && /HTTP (401|403)/.test(err.message)) {
       throw new AuthError(
-        'X OAuth token missing or expired. Set X_ACCESS_TOKEN or run: crossmind auth login x'
+        'X OAuth token missing or expired.\n' +
+        '  Set X_ACCESS_TOKEN, or run: crossmind auth login x --access-token <token>\n' +
+        '  No Developer App? Get a token at https://crossmind.io\n' +
+        '  Setup guide: https://crossmind.io/docs/x-setup'
       );
     }
     throw err;

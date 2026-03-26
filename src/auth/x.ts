@@ -15,6 +15,9 @@ import { saveCredential, loadCredential, resolveAccount } from './store.js';
 // X OAuth 2.0 app credentials (public client - PKCE only, no secret)
 // Users can override via env vars
 export const X_CLIENT_ID = process.env['X_CLIENT_ID'] ?? 'YOUR_X_CLIENT_ID';
+
+const DOCS_X_SETUP = 'https://crossmind.io/docs/x-setup';
+const CROSSMIND_IO  = 'https://crossmind.io';
 const X_REDIRECT_PORT = 7878;
 const X_REDIRECT_URI = `http://127.0.0.1:${X_REDIRECT_PORT}/callback`;
 
@@ -29,8 +32,17 @@ const X_OAUTH_CONFIG: OAuthConfig = {
 /**
  * Run the X OAuth 2.0 PKCE flow.
  * Opens browser, waits for callback, saves tokens.
+ * Requires X_CLIENT_ID env var (register at developer.twitter.com).
  */
 export async function loginX(accountName: string, dataDir?: string): Promise<void> {
+  if (X_CLIENT_ID === 'YOUR_X_CLIENT_ID') {
+    throw new Error(
+      'X_CLIENT_ID is not set. To use the browser OAuth flow, register a Developer App first.\n' +
+      `Setup guide: ${DOCS_X_SETUP}\n\n` +
+      `Alternatively, get a ready-to-use token at ${CROSSMIND_IO} — no Developer App needed.`
+    );
+  }
+
   const verifier = generateCodeVerifier();
   const challenge = generateCodeChallenge(verifier);
   const state = generateState();
@@ -57,6 +69,18 @@ export async function loginX(accountName: string, dataDir?: string): Promise<voi
   }, dataDir);
 
   console.log(`X account saved as "${accountName}".`);
+}
+
+/**
+ * Save an X OAuth access token directly (skips browser PKCE flow).
+ * Use when you already have a token from CrossMind.io or another source.
+ */
+export async function saveAccessToken(
+  accountName: string,
+  accessToken: string,
+  dataDir?: string
+): Promise<void> {
+  await saveCredential({ platform: 'x', name: accountName, accessToken }, dataDir);
 }
 
 /**

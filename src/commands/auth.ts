@@ -4,7 +4,7 @@
  */
 
 import { Command } from 'commander';
-import { loginX, saveCookieAuth, saveBearerToken } from '../auth/x.js';
+import { loginX, saveCookieAuth, saveBearerToken, saveAccessToken } from '../auth/x.js';
 import { loginReddit, saveRedditCookies } from '../auth/reddit.js';
 import { loginBluesky } from '../auth/bluesky.js';
 import { saveGitHubToken } from '../auth/github.js';
@@ -41,6 +41,7 @@ export function registerAuthCommands(program: Command): void {
     .option('--cookie <cookie>', 'Provide raw cookie string directly')
     .option('--auth-token <authToken>', 'X auth_token cookie value')
     .option('--ct0 <ct0>', 'X ct0 CSRF token')
+    .option('--access-token <accessToken>', 'X OAuth access token (skip browser flow)')
     .option('--bearer-token <bearerToken>', 'X developer bearer token (read-only, no login required)')
     .option('--handle <handle>', 'Bluesky handle (e.g. user.bsky.social)')
     .option('--app-password <password>', 'Bluesky app password')
@@ -55,6 +56,7 @@ export function registerAuthCommands(program: Command): void {
         cookie?: string;
         authToken?: string;
         ct0?: string;
+        accessToken?: string;
         bearerToken?: string;
         handle?: string;
         appPassword?: string;
@@ -71,12 +73,16 @@ export function registerAuthCommands(program: Command): void {
             if (opts.bearerToken) {
               // App-only bearer token — read-only, no account login needed
               await saveBearerToken(accountName, opts.bearerToken, opts.dataDir);
+            } else if (opts.accessToken) {
+              // Direct OAuth access token injection — skips browser flow
+              await saveAccessToken(accountName, opts.accessToken, opts.dataDir);
+              console.log(`X OAuth token saved as "${accountName}".`);
             } else if (opts.authToken && opts.ct0) {
               // Direct cookie auth
               await saveCookieAuth(accountName, opts.authToken, opts.ct0, opts.dataDir);
               console.log(`X cookies saved as "${accountName}".`);
             } else {
-              // OAuth 2.0 PKCE flow
+              // OAuth 2.0 PKCE flow — requires X_CLIENT_ID
               await loginX(accountName, opts.dataDir);
             }
             break;

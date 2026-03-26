@@ -438,7 +438,12 @@ export async function getDMList(
 ): Promise<XDMEvent[]> {
   const creds = await loadXCredentials(account, dataDir);
   if (!creds?.accessToken) {
-    throw new AuthError('DM read requires OAuth. Run: crossmind auth login x');
+    throw new AuthError(
+      'DM read requires OAuth.\n' +
+      '  Set X_ACCESS_TOKEN, or run: crossmind auth login x --access-token <token>\n' +
+      '  No Developer App? Get a token at https://crossmind.io\n' +
+      '  Setup guide: https://crossmind.io/docs/x-setup'
+    );
   }
   const params = new URLSearchParams({
     max_results: String(Math.min(limit, 100)),
@@ -475,7 +480,12 @@ export async function getDMConversation(
 ): Promise<XDMEvent[]> {
   const creds = await loadXCredentials(account, dataDir);
   if (!creds?.accessToken) {
-    throw new AuthError('DM read requires OAuth. Run: crossmind auth login x');
+    throw new AuthError(
+      'DM read requires OAuth.\n' +
+      '  Set X_ACCESS_TOKEN, or run: crossmind auth login x --access-token <token>\n' +
+      '  No Developer App? Get a token at https://crossmind.io\n' +
+      '  Setup guide: https://crossmind.io/docs/x-setup'
+    );
   }
   const targetData = await xRequest<{ data: { id: string } }>(
     `/2/users/by/username/${participantUsername}`,

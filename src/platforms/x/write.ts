@@ -23,7 +23,10 @@ async function getXCreds(account?: string, dataDir?: string) {
   const creds = await loadXCredentials(account, dataDir);
   if (!creds?.accessToken && (!creds?.authToken || !creds?.ct0)) {
     throw new AuthError(
-      'X write operations require OAuth. Set X_ACCESS_TOKEN or run: crossmind auth login x'
+      'X write operations require OAuth.\n' +
+      '  Set X_ACCESS_TOKEN, or run: crossmind auth login x --access-token <token>\n' +
+      '  No Developer App? Get a token at https://crossmind.io\n' +
+      '  Setup guide: https://crossmind.io/docs/x-setup'
     );
   }
   return creds!;
