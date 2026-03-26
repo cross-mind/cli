@@ -95,10 +95,23 @@ export class ExtractCookieLoginRequired extends Error {
 }
 
 /**
- * Returns the persistent browser profile directory for a platform.
- * Creates the directory if it does not exist.
+ * Resolve the browser profile directory to use.
+ *
+ * Resolution order (first match wins):
+ *   1. Explicit argument passed by the caller (e.g. from --profile-dir CLI flag)
+ *   2. BROWSER_USER_DATA_DIR env var
+ *   3. ~/.config/crossmind/browser-profiles/<platform>/ — local fallback (auto-created)
  */
-function profileDir(platformKey: string): string {
+function resolveProfileDir(platformKey: string, explicit?: string): string {
+  if (explicit) {
+    fs.mkdirSync(explicit, { recursive: true });
+    return explicit;
+  }
+  if (process.env['BROWSER_USER_DATA_DIR']) {
+    const dir = process.env['BROWSER_USER_DATA_DIR'];
+    fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  }
   const dir = path.join(os.homedir(), '.config', 'crossmind', 'browser-profiles', platformKey);
   fs.mkdirSync(dir, { recursive: true });
   return dir;
@@ -112,12 +125,15 @@ function profileDir(platformKey: string): string {
  * @param dataDir      - Optional credential store directory
  * @param headed       - When true, open a visible browser for manual login.
  *                       When false (default), fail fast if not logged in.
+ * @param profileDir   - Explicit browser profile directory. Falls back to
+ *                       BROWSER_USER_DATA_DIR env var, then a default local path.
  */
 export async function extractAndSaveCookies(
   platformKey: string,
   accountName: string,
   dataDir?: string,
   headed = false,
+  profileDir?: string,
 ): Promise<void> {
   const target = COOKIE_TARGETS[platformKey];
   if (!target) {
@@ -127,7 +143,7 @@ export async function extractAndSaveCookies(
     );
   }
 
-  const profile = profileDir(platformKey);
+  const profile = resolveProfileDir(platformKey, profileDir);
 
   if (headed) {
     await extractHeaded(target, accountName, dataDir, profile);

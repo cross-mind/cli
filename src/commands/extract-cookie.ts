@@ -19,12 +19,13 @@ export function registerExtractCookieCommand(program: Command): void {
       `Extract session cookies via browser. Platforms: ${Object.keys(COOKIE_TARGETS).join(', ')}\n` +
       '  Headless by default (reuses saved session). Use --headed for first-time login.'
     )
-    .option('--data-dir <dir>', 'Data directory override')
+    .option('--data-dir <dir>', 'Credential store directory override')
+    .option('--profile-dir <dir>', 'Browser profile directory (overrides BROWSER_USER_DATA_DIR env var)')
     .option('--headed', 'Open a visible browser window for manual login')
-    .action(async (platform: string, account: string | undefined, opts: { dataDir?: string; headed?: boolean }) => {
+    .action(async (platform: string, account: string | undefined, opts: { dataDir?: string; profileDir?: string; headed?: boolean }) => {
       const accountName = account ?? 'default';
       try {
-        await extractAndSaveCookies(platform, accountName, opts.dataDir, opts.headed ?? false);
+        await extractAndSaveCookies(platform, accountName, opts.dataDir, opts.headed ?? false, opts.profileDir);
       } catch (err) {
         if (err instanceof ExtractCookieLoginRequired) {
           console.error(err.message);
