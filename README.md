@@ -314,6 +314,7 @@ crossmind reddit subscribe <subreddit>
 crossmind reddit post <subreddit> <title> <url>       # Link post
 crossmind reddit text-post <subreddit> <title> <text>  # Text post
 crossmind reddit crosspost <target_sub> <post_id>
+crossmind reddit delete <fullname>                    # Delete own post (t3_xxx) or comment (t1_xxx)
 ```
 
 ### Bluesky (`bsky`)
@@ -366,7 +367,8 @@ crossmind ig posts <username> [limit]       # Recent posts
 ### LinkedIn (`li`)
 
 ```bash
-crossmind li post "text content"            # Post (requires LINKEDIN_ACCESS_TOKEN or stored OAuth token)
+crossmind li post "text content"            # Post (requires OAuth token)
+crossmind li delete <post_id>               # Delete post (OAuth token, post_id or full URN)
 crossmind li profile <username>             # Profile (URL username, requires cookie auth)
 crossmind li feed [limit]                   # Home feed (requires cookie auth)
 ```

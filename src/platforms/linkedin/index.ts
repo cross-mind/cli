@@ -122,6 +122,22 @@ async function postToLinkedIn(
   };
 }
 
+/**
+ * Delete a LinkedIn UGC post.
+ * postId: bare numeric ID or full URN (urn:li:ugcPost:123456)
+ */
+async function deleteLinkedInPost(postId: string, account?: string, dataDir?: string): Promise<void> {
+  const token = await loadLinkedInOAuthToken(account, dataDir);
+  const fullUrn = postId.startsWith('urn:') ? postId : `urn:li:ugcPost:${postId}`;
+  await request(`${LI_OAUTH_API}/v2/ugcPosts/${encodeURIComponent(fullUrn)}`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'X-Restli-Protocol-Version': '2.0.0',
+    },
+  });
+}
+
 async function getProfile(username: string, account?: string, dataDir?: string): Promise<LIProfile | null> {
   const headers = await getLiHeaders(account, dataDir);
   const data = await request<Record<string, unknown>>(
@@ -241,6 +257,21 @@ export function registerLinkedIn(program: Command): void {
       try {
         const result = await postToLinkedIn(text, opts.account, opts.dataDir);
         console.log(`Posted: ${result.url}`);
+      } catch (err) {
+        console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
+      }
+    });
+
+  li
+    .command('delete <post_id>')
+    .description('Delete a LinkedIn post (post_id from li post output, or full URN urn:li:ugcPost:…)')
+    .option('--account <name>', 'Account to use')
+    .option('--data-dir <dir>', 'Data directory override')
+    .action(async (postId: string, opts: { account?: string; dataDir?: string }) => {
+      try {
+        await deleteLinkedInPost(postId, opts.account, opts.dataDir);
+        console.log(`deleted:${postId}`);
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
         process.exit(1);

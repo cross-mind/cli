@@ -123,6 +123,25 @@ export async function vote(
   return { success: true, message: `${dirLabel}:${id}` };
 }
 
+/** Delete a post or comment you authored */
+export async function deleteItem(
+  id: string,   // fullname: t3_<postId> or t1_<commentId>
+  account?: string,
+  dataDir?: string
+): Promise<RedditWriteResult> {
+  const { baseUrl, headers } = await getWriteConfig(account, dataDir);
+  await writeDelay();
+
+  const body = new URLSearchParams({ id });
+  await request(`${baseUrl}/api/del`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString() as unknown,
+  });
+
+  return { success: true, message: `deleted:${id}` };
+}
+
 /** Save a post or comment */
 export async function saveItem(
   id: string,

@@ -1,7 +1,7 @@
 /**
  * Reddit platform commands.
  * Read: subreddit, popular, all, search, comments, post, sub-info, user, user-posts, user-comments, home, saved
- * Write: comment, vote, save, subscribe, post, text-post, crosspost
+ * Write: comment, vote, save, subscribe, post, text-post, crosspost, delete
  */
 
 import { Command } from 'commander';
@@ -10,7 +10,7 @@ import {
   getPopular, getAll, getSubredditInfo, getRedditUserProfile,
   getUserPosts, getUserComments, getPost, getHomeFeed, getSaved,
 } from './read.js';
-import { submitComment, vote, saveItem, subscribeSubreddit, submitPost, submitTextPost, crosspost } from './write.js';
+import { submitComment, vote, saveItem, deleteItem, subscribeSubreddit, submitPost, submitTextPost, crosspost } from './write.js';
 import { printOutput } from '../../output/formatter.js';
 
 const POST_TEMPLATE = '{rank}. r/{subreddit} score:{score} comments:{comments} [{flair}] {title} — {url}';
@@ -386,6 +386,21 @@ export function registerReddit(program: Command): void {
     .action(async (targetSub: string, postId: string, title: string, opts: { account?: string; dataDir?: string }) => {
       try {
         const result = await crosspost(targetSub, postId, title, opts.account, opts.dataDir);
+        console.log(result.message);
+      } catch (err) {
+        console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
+      }
+    });
+
+  reddit
+    .command('delete <fullname>')
+    .description('Delete your own post or comment (fullname: t3_<postId> or t1_<commentId>)')
+    .option('--account <name>', 'Account to use')
+    .option('--data-dir <dir>', 'Data directory override')
+    .action(async (fullname: string, opts: { account?: string; dataDir?: string }) => {
+      try {
+        const result = await deleteItem(fullname, opts.account, opts.dataDir);
         console.log(result.message);
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
