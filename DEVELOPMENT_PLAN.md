@@ -809,3 +809,115 @@ X API v2 免费层限制严格：
 6. **Phase 6**（发布）— 对外可用后跟上
 
 可以在 Phase 1+3 完成后就内部使用，Phase 1+3+2+4 完成后对外发布。
+
+---
+
+## 八、当前实施进度（2026-03-26）
+
+仓库：[https://github.com/cross-mind/cli](https://github.com/cross-mind/cli)
+
+### 进度总览
+
+| Phase | 状态 | 备注 |
+|-------|------|------|
+| Phase 1：基础架构 | ✅ 完成 | |
+| Phase 2：Reddit | ✅ 完成 | |
+| Phase 3：X + Bluesky | 🟡 部分完成 | X 可用；Bluesky 框架在但未验证 |
+| Phase 4：研究类平台 | 🟡 部分完成 | 6/9 可用，PH/YouTube/Bluesky 待处理 |
+| Phase 5：Instagram/LinkedIn | 🟡 框架在 | 报清晰错误，cookie 提取未验证 |
+| Phase 6：打磨与发布 | ❌ 未开始 | |
+
+---
+
+### Phase 1 完成情况
+
+- ✅ TypeScript + pnpm + commander.js 项目架构
+- ✅ HTTP 基础客户端（jitter + retry + backoff）
+- ✅ YAML pipeline executor（adapters/）
+- ✅ Output formatter（紧凑单行 + `--json`）
+- ✅ 多账号凭证存储（`~/.crossmind/` 或 `CROSSMIND_DATA_DIR`）
+- ✅ `crossmind account` 命令组
+- ✅ `crossmind extract-cookie` 命令（Playwright，支持 x/instagram/linkedin）
+- ✅ `crossmind auth status`
+- ✅ HN：top/ask/search/show（YAML pipeline）
+- ✅ 48 个单元测试 + 集成测试，全部通过
+
+### Phase 2 完成情况
+
+- ✅ Reddit OAuth 2.0 PKCE
+- ✅ Reddit cookie auth（session + modhash）
+- ✅ 认证优先链：公开 API → cookie → OAuth
+- ✅ Reddit 读命令：`r <subreddit>`、`search`、`comments`
+- ✅ Reddit 写命令：`comment`、`upvote/downvote`、`save`、`subscribe`、`post`
+- ✅ 写操作 daily limit 保护（`src/http/rate-limiter.ts`）
+
+### Phase 3 当前状态
+
+**X (Twitter) — 可用**
+- ✅ Cookie auth（auth_token + ct0）
+- ✅ 认证优先链：cookie → OAuth token → public bearer（仅 search）
+- ✅ `x search`、`x home`、`x timeline`、`x profile`
+- ✅ OAuth 2.0 PKCE 写操作（`x post`、`x reply`、`x like`、`x retweet`、`x follow`、`x dm`、`x delete`）
+- ✅ 写操作 daily limit 保护
+
+**X 架构特殊说明 — twitter-cli bridge**
+
+原计划使用 Node.js 原生 TLS fingerprint 模拟访问 `x.com/i/api/graphql`。实测发现 x.com 对非 Chrome JA3 指纹返回 404（bot 检测），Node.js `fetch()` 无法绕过。
+
+当前方案：cookie auth 时通过 subprocess 调用 `/root/.local/share/uv/tools/twitter-cli/bin/twitter`，该工具使用 `curl_cffi` Python 库模拟 Chrome TLS。REST v2 API 作为无 cookie 时的降级路径。
+
+**影响：**
+- 运行时依赖外部 `twitter-cli` 二进制（需预装 uv + `uvx install twitter-cli`）
+- cookie 读操作速度约 2–10 秒（subprocess 启动 + Python 开销），高于原生 fetch
+- 无 `twitter-cli` 时自动降级到 v2 REST（search 功能受限，feed/home 不可用）
+
+**待实现（原 Phase 3 计划中）：**
+- ❌ `x thread`：读取完整对话串
+- ❌ `x dm list / dm conversation`：DM 读取（cookie auth）
+- ❌ `x lists`、`x list-timeline`、`x list-members`、`x list-create`
+- ❌ `x spaces`：Spaces 发现/搜索
+- ❌ `x analytics`：推文 + 账号数据
+- ❌ `x bookmarks`、`x likes <handle>`、`x followers`、`x following`
+- ❌ `x trending`
+
+**Bluesky — 框架完成，未端到端验证**
+- ✅ AT Protocol app password auth（`src/auth/bluesky.ts`）
+- ✅ 读命令：`bsky timeline`、`bsky search`、`bsky profile`、`bsky posts`
+- ✅ 写命令：`bsky post`、`bsky reply`、`bsky like`、`bsky repost`、`bsky follow`、`bsky delete`
+- ⚠️ 未能端到端测试（需要 Bluesky 账号 + app password）
+- ⚠️ `bsky search` 当前要求 auth，计划改为 public API 路径（`app.bsky.feed.searchPosts` 支持无鉴权访问）
+
+### Phase 4 当前状态
+
+| 平台 | 状态 | 备注 |
+|------|------|------|
+| GitHub | ✅ 可用 | trending、search，public API |
+| Lobsters | ✅ 可用 | YAML pipeline |
+| DEV.to | ✅ 可用 | search、tag，public API |
+| Stack Overflow | ✅ 可用 | search，public API |
+| arXiv | ✅ 可用 | search with `--cat` 过滤 |
+| Medium | ✅ 可用 | tag feed（RSS） |
+| Substack | ✅ 可用 | newsletter feed（RSS） |
+| Product Hunt | ⚠️ 需 API token | 当前返回 401；需在 PH Developer Portal 申请 token |
+| YouTube | ⚠️ 需 API key | 框架在，`yt search` 需配置 Google Data API v3 key |
+
+### Phase 5 当前状态
+
+- ✅ Instagram/LinkedIn 命令框架完整
+- ✅ 无 cookie 时返回明确错误信息 + 操作指引
+- ⚠️ `extract-cookie` 命令基于 Playwright，在无图形界面的 CI 环境中需要 `--headless` 支持
+- ⚠️ 实际 cookie 提取未在生产环境验证
+
+---
+
+### 已知问题与待处理事项
+
+| 问题 | 优先级 | 说明 |
+|------|--------|------|
+| twitter-cli 运行时依赖 | 🔴 高 | 需预装 uv 工具链；部署文档和 README 须说明 |
+| Bluesky search 强制 auth | 🟡 中 | AT Protocol `app.bsky.feed.searchPosts` 公开端点无需鉴权，可去掉 auth gate |
+| Product Hunt 401 | 🟡 中 | 申请 PH developer token 后可用 |
+| X 高级读命令缺失 | 🟡 中 | DM / Lists / Spaces / Analytics 未实现 |
+| YouTube API key 未配置 | 🟢 低 | 功能本身已实现，需用户提供 key |
+| npm 发布 + 单文件二进制 | 🟢 低 | Phase 6 内容，对外发布前处理 |
+| Playwright 无头环境兼容 | 🟢 低 | ig/li cookie 提取在 server 环境需要验证 |
