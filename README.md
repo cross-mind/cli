@@ -282,8 +282,8 @@ crossmind x follow <username>
 crossmind x unfollow <username>
 crossmind x dm <username> <text>
 crossmind x delete <tweet_id>
-crossmind x bookmark <tweet_id>     # cookie + curl_cffi required
-crossmind x unbookmark <tweet_id>   # cookie + curl_cffi required
+crossmind x bookmark <tweet_id>     # cookie auth required
+crossmind x unbookmark <tweet_id>   # cookie auth required
 ```
 
 ### Reddit (`reddit`)
@@ -460,22 +460,14 @@ The bundled `scripts/x-fetch.py` handles X's Chrome TLS fingerprint check. Witho
 
 ## Runtime Dependencies
 
-For X cookie-auth commands (home feed, bookmarks, DMs):
-```bash
-uv pip install curl_cffi
-# or: pip install curl_cffi
-```
-
-Verify:
-```bash
-crossmind auth status
-```
+X cookie-auth commands (home feed, bookmarks, DMs) require Python 3.
+The `curl_cffi` library is **installed automatically on first use** — no manual setup needed.
 
 ## Requirements
 
 - Node.js 20+
 - pnpm or npm
-- For X cookie reads: Python 3 with `curl_cffi` (`uv pip install curl_cffi`)
+- For X cookie reads: Python 3 (curl_cffi is auto-installed on first use)
 
 ## License
 
