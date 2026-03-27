@@ -49,6 +49,76 @@ except ImportError:
         )
     from curl_cffi import requests as cffi_requests
 
+# ── x_client_transaction import (optional, from twitter-cli venv) ───────────
+# Generates x-client-transaction-id header required by X's GraphQL endpoints.
+
+import time
+
+_CT_VENV = "/root/.local/share/uv/tools/twitter-cli/lib/python3.11/site-packages"
+_client_transaction: Optional[Any] = None
+_ct_initialized = False
+_ct_cache_path = os.path.expanduser("~/.cache/x-fetch-ct.json")
+_CT_TTL = 3600  # 1 hour
+
+
+def _init_client_transaction() -> None:
+    global _client_transaction, _ct_initialized
+    if _ct_initialized:
+        return
+    _ct_initialized = True
+
+    # Try cache first
+    try:
+        if os.path.exists(_ct_cache_path):
+            with open(_ct_cache_path, encoding="utf-8") as f:
+                cached = json.load(f)
+            if time.time() - cached.get("ts", 0) < _CT_TTL:
+                if _CT_VENV not in sys.path:
+                    sys.path.insert(0, _CT_VENV)
+                import bs4
+                from x_client_transaction import ClientTransaction
+                _client_transaction = ClientTransaction(
+                    home_page_response=bs4.BeautifulSoup(cached["html"], "html.parser"),
+                    ondemand_file_response=cached["ondemand"],
+                )
+                return
+    except Exception:
+        pass
+
+    # Fetch fresh
+    try:
+        if _CT_VENV not in sys.path:
+            sys.path.insert(0, _CT_VENV)
+        import bs4
+        from x_client_transaction import ClientTransaction
+        from x_client_transaction.utils import generate_headers as _ct_gen_headers, get_ondemand_file_url
+        s = _get_session()
+        ct_hdrs = _ct_gen_headers()
+        home = s.get("https://x.com", headers=ct_hdrs, timeout=15)
+        soup = bs4.BeautifulSoup(home.content, "html.parser")
+        od_url = get_ondemand_file_url(response=soup)
+        od = s.get(od_url, headers=ct_hdrs, timeout=15)
+        _client_transaction = ClientTransaction(
+            home_page_response=soup,
+            ondemand_file_response=od.text,
+        )
+        # Persist cache
+        os.makedirs(os.path.dirname(_ct_cache_path), exist_ok=True)
+        with open(_ct_cache_path, "w", encoding="utf-8") as f:
+            json.dump({"html": home.text, "ondemand": od.text, "ts": time.time()}, f)
+    except Exception:
+        pass  # Silently degrade — requests work without CT-id on some endpoints
+
+
+def _transaction_id(method: str, path: str) -> Optional[str]:
+    _init_client_transaction()
+    if _client_transaction is None:
+        return None
+    try:
+        return _client_transaction.generate_transaction_id(method=method, path=path)
+    except Exception:
+        return None
+
 
 def _out(ok: bool, data: Any, error_msg: Optional[str] = None) -> None:
     obj: Dict[str, Any] = {"ok": ok}
@@ -75,7 +145,7 @@ BEARER = (
 
 QUERY_IDS: Dict[str, str] = {
     "HomeTimeline":             "HCosKfLNW1AcOo3la3mMgg",
-    "SearchTimeline":           "MJpyQGqgklrVl_0X9gNy3A",
+    "SearchTimeline":           "GcXk9vN_d1jUfHNqLacXQA",
     "UserTweets":               "E3opETHurmVJflFsUBVuUQ",
     "UserByScreenName":         "qRednkZG-rn1P6b48NINmQ",
     "TweetDetail":              "nBS-WpgA6ZG0CyNHD517JQ",
@@ -89,25 +159,41 @@ QUERY_IDS: Dict[str, str] = {
 }
 
 FEATURES: Dict[str, bool] = {
-    "responsive_web_graphql_exclude_directive_enabled": True,
+    "rweb_video_screen_enabled": False,
+    "profile_label_improvements_pcf_label_in_post_enabled": True,
+    "responsive_web_profile_redirect_enabled": False,
+    "rweb_tipjar_consumption_enabled": False,
     "verified_phone_label_enabled": False,
     "creator_subscriptions_tweet_preview_api_enabled": True,
     "responsive_web_graphql_timeline_navigation_enabled": True,
     "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
+    "premium_content_api_read_enabled": False,
+    "communities_web_enable_tweet_community_results_fetch": True,
     "c9s_tweet_anatomy_moderator_badge_enabled": True,
-    "tweetypie_unmention_optimization_enabled": True,
+    "responsive_web_grok_analyze_button_fetch_trends_enabled": False,
+    "responsive_web_grok_analyze_post_followups_enabled": True,
+    "responsive_web_jetfuel_frame": True,
+    "responsive_web_grok_share_attachment_enabled": True,
+    "responsive_web_grok_annotations_enabled": True,
+    "articles_preview_enabled": True,
     "responsive_web_edit_tweet_api_enabled": True,
     "graphql_is_translatable_rweb_tweet_is_translatable_enabled": True,
     "view_counts_everywhere_api_enabled": True,
     "longform_notetweets_consumption_enabled": True,
     "responsive_web_twitter_article_tweet_consumption_enabled": True,
-    "tweet_awards_web_tipping_enabled": False,
-    "longform_notetweets_rich_text_read_enabled": True,
-    "longform_notetweets_inline_media_enabled": True,
-    "rweb_video_timestamps_enabled": True,
-    "responsive_web_media_download_video_enabled": True,
+    "content_disclosure_indicator_enabled": True,
+    "content_disclosure_ai_generated_indicator_enabled": True,
+    "responsive_web_grok_show_grok_translated_post": True,
+    "responsive_web_grok_analysis_button_from_backend": True,
+    "post_ctas_fetch_enabled": True,
     "freedom_of_speech_not_reach_fetch_enabled": True,
     "standardized_nudges_misinfo": True,
+    "tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled": True,
+    "longform_notetweets_rich_text_read_enabled": True,
+    "longform_notetweets_inline_media_enabled": False,
+    "responsive_web_grok_image_annotation_enabled": True,
+    "responsive_web_grok_imagine_annotation_enabled": True,
+    "responsive_web_grok_community_note_auto_translation_is_enabled": False,
     "responsive_web_enhance_cards_enabled": False,
 }
 
@@ -121,8 +207,8 @@ def _get_session() -> cffi_requests.Session:
         _session = cffi_requests.Session(impersonate="chrome")
     return _session
 
-def _headers() -> Dict[str, str]:
-    return {
+def _headers(path: Optional[str] = None, method: str = "GET") -> Dict[str, str]:
+    h = {
         "authorization": f"Bearer {BEARER}",
         "content-type": "application/json",
         "x-csrf-token": CT0,
@@ -132,7 +218,13 @@ def _headers() -> Dict[str, str]:
         "x-twitter-client-language": "en",
         "referer": "https://x.com/",
         "origin": "https://x.com",
+        "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
     }
+    if path:
+        tid = _transaction_id(method, path)
+        if tid:
+            h["x-client-transaction-id"] = tid
+    return h
 
 # ── Query ID resolution ──────────────────────────────────────────────────────
 
@@ -160,7 +252,7 @@ def _resolve_query_id(operation: str, refresh: bool = False) -> str:
 
 def _gql_url(operation: str, variables: Dict[str, Any], features: Optional[Dict[str, bool]] = None) -> str:
     qid = _resolve_query_id(operation)
-    feat = {k: v for k, v in (features or FEATURES).items() if v is not False}
+    feat = dict(features or FEATURES)
     return (
         f"https://x.com/i/api/graphql/{qid}/{operation}"
         f"?variables={urllib.parse.quote(json.dumps(variables, separators=(',', ':')))}"
@@ -169,26 +261,30 @@ def _gql_url(operation: str, variables: Dict[str, Any], features: Optional[Dict[
 
 def _gql_get(operation: str, variables: Dict[str, Any]) -> Dict[str, Any]:
     url = _gql_url(operation, variables)
-    resp = _get_session().get(url, headers=_headers(), timeout=20)
-    if resp.status_code in (400, 403):
+    path = urllib.parse.urlparse(url).path
+    resp = _get_session().get(url, headers=_headers(path=path, method="GET"), timeout=20)
+    if resp.status_code in (400, 403, 404):
         # Query ID may have rotated — refresh once
         _resolve_query_id(operation, refresh=True)
         url = _gql_url(operation, variables)
-        resp = _get_session().get(url, headers=_headers(), timeout=20)
+        path = urllib.parse.urlparse(url).path
+        resp = _get_session().get(url, headers=_headers(path=path, method="GET"), timeout=20)
     resp.raise_for_status()
     return resp.json()
 
 def _gql_post(operation: str, variables: Dict[str, Any]) -> Dict[str, Any]:
     qid = _resolve_query_id(operation)
     url = f"https://x.com/i/api/graphql/{qid}/{operation}"
+    path = f"/i/api/graphql/{qid}/{operation}"
     body = {"variables": variables, "queryId": qid}
-    resp = _get_session().post(url, headers=_headers(), json=body, timeout=20)
+    resp = _get_session().post(url, headers=_headers(path=path, method="POST"), json=body, timeout=20)
     if resp.status_code in (400, 403, 404):
         _resolve_query_id(operation, refresh=True)
         qid = QUERY_IDS.get(operation, qid)
         url = f"https://x.com/i/api/graphql/{qid}/{operation}"
+        path = f"/i/api/graphql/{qid}/{operation}"
         body["queryId"] = qid
-        resp = _get_session().post(url, headers=_headers(), json=body, timeout=20)
+        resp = _get_session().post(url, headers=_headers(path=path, method="POST"), json=body, timeout=20)
     resp.raise_for_status()
     return resp.json()
 
@@ -213,19 +309,23 @@ def _parse_tweet(result: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
 
     legacy = result.get("legacy") or {}
     core = result.get("core") or {}
-    user_legacy = _dig(core, "user_results", "result", "legacy") or {}
+    user_result = _dig(core, "user_results", "result") or {}
+    # screen_name/name may be in user_result.core (new API) or user_result.legacy (old API)
+    user_core = user_result.get("core") or {}
+    user_legacy = user_result.get("legacy") or {}
+    screen_name = user_core.get("screen_name") or user_legacy.get("screen_name", "")
+    author_name = user_core.get("name") or user_legacy.get("name", "")
     views = result.get("views") or {}
 
     tweet_id = legacy.get("id_str") or result.get("rest_id") or ""
-    screen_name = user_legacy.get("screen_name", "")
 
     return {
         "id": tweet_id,
         "text": legacy.get("full_text", ""),
         "author": {
             "screenName": screen_name,
-            "name": user_legacy.get("name", ""),
-            "id": _dig(core, "user_results", "result", "rest_id", default=""),
+            "name": author_name,
+            "id": user_result.get("rest_id", ""),
         },
         "metrics": {
             "likes":     legacy.get("favorite_count", 0),
@@ -326,6 +426,7 @@ def cmd_search(query: str, count: int = 20) -> None:
         "count": count,
         "querySource": "typed_query",
         "product": "Top",
+        "withGrokTranslatedBio": False,
     }
     data = _gql_get("SearchTimeline", variables)
     instructions = _extract_instructions(

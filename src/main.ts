@@ -27,8 +27,10 @@ import { registerLinkedIn } from './platforms/linkedin/index.js';
 import { registerAuthCommands } from './commands/auth.js';
 import { registerAccountCommands } from './commands/account.js';
 import { registerExtractCookieCommand } from './commands/extract-cookie.js';
+import { createRequire } from 'module';
 
-const VERSION = '0.1.0';
+const _require = createRequire(import.meta.url);
+const VERSION: string = (_require('../package.json') as { version: string }).version;
 
 const program = new Command();
 

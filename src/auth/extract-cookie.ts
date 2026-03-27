@@ -38,6 +38,22 @@ function findChrome(): string | undefined {
   return undefined; // Fall back to Playwright's bundled browser
 }
 
+/** Chrome flags safe for containerized / sandboxless environments.
+ *  Matches the flags used by playwright-mcp for stability. */
+const CHROME_ARGS = [
+  '--no-sandbox',
+  '--disable-setuid-sandbox',
+  '--disable-gpu',
+  '--disable-dev-shm-usage',
+  '--enable-unsafe-swiftshader',
+  '--no-first-run',
+  '--no-default-browser-check',
+  '--disable-features=AutomationControlled,MediaRouter,GlobalMediaControls,Translate',
+  '--disable-background-networking',
+  '--disable-extensions',
+  '--metrics-recording-only',
+];
+
 export interface CookieTarget {
   platform: string;
   loginUrl: string;
@@ -88,7 +104,7 @@ export class ExtractCookieLoginRequired extends Error {
   constructor(public readonly platformKey: string) {
     super(
       `Not logged in to ${platformKey}. ` +
-      'Run "crossmind auth extract-cookie ' + platformKey + ' --headed" to open a browser window and log in.'
+      'Run "crossmind extract-cookie ' + platformKey + ' --headed" to open a browser window and log in.'
     );
     this.name = 'ExtractCookieLoginRequired';
   }
@@ -164,7 +180,7 @@ async function extractHeadless(
   const context = await chromium.launchPersistentContext(profile, {
     headless: true,
     executablePath,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: CHROME_ARGS,
   });
 
   try {
@@ -214,11 +230,11 @@ async function extractHeaded(
   const context = await chromium.launchPersistentContext(profile, {
     headless: false,
     executablePath,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: CHROME_ARGS,
   });
 
   const page = await context.newPage();
-  await page.goto(target.loginUrl);
+  await page.goto(target.loginUrl, { waitUntil: 'domcontentloaded', timeout: 15_000 });
 
   // Wait for successful login
   await new Promise<void>((resolve, reject) => {
