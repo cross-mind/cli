@@ -217,17 +217,39 @@ export async function sendDM(
   );
   const targetId = targetData.data.id;
 
-  const data = await xRequest<{ data: { dm_conversation_id: string } }>(
-    '/2/dm_conversations',
-    {
-      method: 'POST',
-      creds,
-      body: {
-        participant_id: targetId,
-        message: { text },
-      },
+  let data: { data: { dm_conversation_id: string } };
+  try {
+    data = await xRequest<{ data: { dm_conversation_id: string } }>(
+      '/2/dm_conversations',
+      {
+        method: 'POST',
+        creds,
+        body: {
+          participant_id: targetId,
+          message: { text },
+        },
+      }
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // code 349: recipient requires sender to follow them first
+    if (/\b349\b/.test(msg) || /not following you/i.test(msg)) {
+      throw new Error(`DM blocked — @${username} only accepts DMs from followers. Reply publicly instead.`);
     }
-  );
+    // code 150: you have blocked this user
+    if (/\b150\b/.test(msg) || /you've blocked/i.test(msg) || /you have blocked/i.test(msg)) {
+      throw new Error(`DM blocked — you have blocked @${username}.`);
+    }
+    // code 327 / 179: protected account
+    if (/\b(327|179)\b/.test(msg) || /protected/i.test(msg)) {
+      throw new Error(`DM blocked — @${username}'s account is protected.`);
+    }
+    // code 226: automated / spam detection
+    if (/\b226\b/.test(msg) || /automated/i.test(msg)) {
+      throw new Error(`DM blocked — flagged as automated content by X. Wait before retrying.`);
+    }
+    throw err;
+  }
 
   return {
     success: true,

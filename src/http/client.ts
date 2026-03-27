@@ -95,7 +95,12 @@ export async function request<T = unknown>(
       }
 
       if (!res.ok) {
-        throw new NetworkError(`HTTP ${res.status} from ${url}`);
+        let detail = '';
+        try {
+          const text = await res.text();
+          if (text) detail = ` — ${text.slice(0, 400)}`;
+        } catch { /* ignore read errors */ }
+        throw new NetworkError(`HTTP ${res.status} from ${url}${detail}`);
       }
 
       const ct = res.headers.get('content-type') ?? '';
