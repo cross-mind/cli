@@ -23,7 +23,7 @@ const DM_TEMPLATE = '{rank}. @{sender}→@{recipient} [{created_at}] — {text}'
 export function registerX(program: Command): void {
   const x = program
     .command('x')
-    .description('X (Twitter) — search, mentions, timeline, post, reply, like, follow, dm, bookmarks, lists, DMs');
+    .description('X (Twitter) — search, mentions, notifications, timeline, post, reply, like, follow, dm, bookmarks, lists, DMs');
 
   // ── Read commands ──────────────────────────────────────────────
 
