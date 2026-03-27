@@ -220,15 +220,11 @@ export async function sendDM(
   let data: { data: { dm_conversation_id: string } };
   try {
     data = await xRequest<{ data: { dm_conversation_id: string } }>(
-      '/2/dm_conversations',
+      `/2/dm_conversations/with/${targetId}/messages`,
       {
         method: 'POST',
         creds,
-        body: {
-          conversation_type: 'OneToOne',
-          participant_ids: [targetId],
-          message: { text },
-        },
+        body: { text },
       }
     );
   } catch (err) {
