@@ -538,7 +538,7 @@ def cmd_user_posts(username: str, count: int = 20) -> None:
     }
     data = _gql_get("UserTweets", variables)
     instructions = _extract_instructions(
-        data, ["data", "user", "result", "timeline_v2", "timeline", "instructions"]
+        data, ["data", "user", "result", "timeline", "timeline", "instructions"]
     )
     tweets = _tweets_from_instructions(instructions)
     _out(True, tweets)
