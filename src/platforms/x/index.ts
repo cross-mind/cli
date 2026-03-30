@@ -18,7 +18,8 @@ import { printOutput } from '../../output/formatter.js';
 
 const TWEET_TEMPLATE = '{rank}. @{author} likes:{likes} rt:{retweets} replies:{replies} — {text} {url}';
 const USER_TEMPLATE = '{rank}. @{username} ({name}) followers:{followers} following:{following} tweets:{tweets} — {bio}';
-const DM_TEMPLATE = '{rank}. @{sender}→@{recipient} [{created_at}] — {text}';
+const DM_TEMPLATE = '{rank}. @{sender} [{created_at}] — {text}';
+const DM_CONVO_TEMPLATE = '{rank}. @{sender}→@{recipient} [{created_at}] — {text}';
 const ANALYTICS_TEMPLATE = '{rank}. {created_at} imp:{views} eng:{engagements} clk:{profile_clicks} lk:{likes} rp:{replies} — {text}';
 
 export function registerX(program: Command): void {
@@ -277,7 +278,7 @@ export function registerX(program: Command): void {
       const limit = limitArg ? parseInt(limitArg, 10) : 20;
       try {
         const items = await getDMConversation(username, limit, opts.account, opts.dataDir);
-        printOutput(items as unknown as Record<string, unknown>[], DM_TEMPLATE, `x/dm/${username}`, start, { json: opts.json });
+        printOutput(items as unknown as Record<string, unknown>[], DM_CONVO_TEMPLATE, `x/dm/${username}`, start, { json: opts.json });
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
         process.exit(1);

@@ -72,7 +72,7 @@ function mapTweetRest(tweet: Record<string, unknown>, author: Record<string, unk
   return {
     rank: index + 1,
     id,
-    text: String(tweet['text'] ?? '').replace(/\n/g, ' ').slice(0, 200),
+    text: String(tweet['text'] ?? ''),
     author: username,
     likes: metrics['like_count'] ?? 0,
     retweets: metrics['retweet_count'] ?? 0,
@@ -496,8 +496,8 @@ export async function getDMList(
     id: String(e['id'] ?? ''),
     sender: userMap[String(e['sender_id'])] ?? String(e['sender_id'] ?? ''),
     recipient: '',
-    text: String(e['text'] ?? '').replace(/\n/g, ' ').slice(0, 200),
-    created_at: String(e['created_at'] ?? '').slice(0, 10),
+    text: String(e['text'] ?? ''),
+    created_at: String(e['created_at'] ?? '').slice(0, 16).replace('T', ' '),
   }));
 }
 
@@ -543,8 +543,8 @@ export async function getDMConversation(
     id: String(e['id'] ?? ''),
     sender: userMap[String(e['sender_id'])] ?? String(e['sender_id'] ?? ''),
     recipient: participantUsername,
-    text: String(e['text'] ?? '').replace(/\n/g, ' ').slice(0, 200),
-    created_at: String(e['created_at'] ?? '').slice(0, 10),
+    text: String(e['text'] ?? ''),
+    created_at: String(e['created_at'] ?? '').slice(0, 16).replace('T', ' '),
   }));
 }
 

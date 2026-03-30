@@ -141,7 +141,7 @@ function mapCliTweet(t: CliTweet, rank: number): XTweet {
   return {
     rank,
     id: t.id,
-    text: (t.text ?? '').replace(/\n/g, ' ').slice(0, 200),
+    text: (t.text ?? ''),
     author: username,
     likes: t.metrics?.likes ?? 0,
     retweets: t.metrics?.retweets ?? 0,

@@ -13,9 +13,9 @@ function renderTemplate(template: string, item: Record<string, unknown>): string
   return template.replace(/\{(\w+)\}/g, (_, key) => {
     const val = item[key];
     if (val === undefined || val === null) return '';
-    const str = String(val);
-    // Truncate long text fields
-    if (['text', 'title', 'description', 'tagline', 'body', 'summary', 'headline'].includes(key) && str.length > 120) {
+    const str = String(val).replace(/\n/g, ' ');
+    // Truncate short label fields
+    if (['title', 'tagline', 'headline'].includes(key) && str.length > 120) {
       return str.slice(0, 117) + '...';
     }
     return str;
