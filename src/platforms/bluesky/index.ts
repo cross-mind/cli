@@ -101,9 +101,10 @@ export function registerBluesky(program: Command): void {
     .description('Post to Bluesky')
     .option('--account <name>', 'Account to use')
     .option('--data-dir <dir>', 'Data directory override')
-    .action(async (text: string, opts: { account?: string; dataDir?: string }) => {
+    .option('-f, --force', 'Skip duplicate content check')
+    .action(async (text: string, opts: { account?: string; dataDir?: string; force?: boolean }) => {
       try {
-        const result = await createPost(text, opts.account, opts.dataDir);
+        const result = await createPost(text, opts.account, opts.dataDir, !!opts.force);
         console.log(result.message);
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -116,9 +117,10 @@ export function registerBluesky(program: Command): void {
     .description('Reply to a post (provide URI and CID)')
     .option('--account <name>', 'Account to use')
     .option('--data-dir <dir>', 'Data directory override')
-    .action(async (postUri: string, postCid: string, text: string, opts: { account?: string; dataDir?: string }) => {
+    .option('-f, --force', 'Skip duplicate content check')
+    .action(async (postUri: string, postCid: string, text: string, opts: { account?: string; dataDir?: string; force?: boolean }) => {
       try {
-        const result = await replyToPost(text, postUri, postCid, postUri, postCid, opts.account, opts.dataDir);
+        const result = await replyToPost(text, postUri, postCid, postUri, postCid, opts.account, opts.dataDir, !!opts.force);
         console.log(result.message);
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);

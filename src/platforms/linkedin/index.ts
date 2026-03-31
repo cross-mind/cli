@@ -11,6 +11,7 @@ import { request } from '../../http/client.js';
 import { printOutput } from '../../output/formatter.js';
 import { loadCredential, resolveAccount } from '../../auth/store.js';
 import { AuthError } from '../../http/client.js';
+import { checkWriteDuplicate, recordWrite } from '../../http/write-history.js';
 
 const LI_API = 'https://www.linkedin.com/voyager/api';
 const LI_OAUTH_API = 'https://api.linkedin.com';
@@ -83,8 +84,13 @@ async function loadLinkedInOAuthToken(account?: string, dataDir?: string): Promi
 async function postToLinkedIn(
   text: string,
   account?: string,
-  dataDir?: string
+  dataDir?: string,
+  force?: boolean
 ): Promise<{ id: string; url: string }> {
+  if (!force) {
+    const dup = await checkWriteDuplicate('linkedin', 'post', text, undefined, dataDir);
+    if (dup.blocked) throw new Error(dup.reason);
+  }
   const token = await loadLinkedInOAuthToken(account, dataDir);
   const headers = {
     'Authorization': `Bearer ${token}`,
@@ -116,6 +122,7 @@ async function postToLinkedIn(
   });
 
   const postId = resp?.id ?? '';
+  await recordWrite('linkedin', 'post', text, undefined, dataDir);
   return {
     id: postId,
     url: `https://www.linkedin.com/feed/update/${postId}/`,
@@ -253,9 +260,10 @@ export function registerLinkedIn(program: Command): void {
     .description('Post to LinkedIn (requires OAuth token: LINKEDIN_ACCESS_TOKEN or auth login linkedin --access-token)')
     .option('--account <name>', 'Account to use')
     .option('--data-dir <dir>', 'Data directory override')
-    .action(async (text: string, opts: { account?: string; dataDir?: string }) => {
+    .option('-f, --force', 'Skip duplicate content check')
+    .action(async (text: string, opts: { account?: string; dataDir?: string; force?: boolean }) => {
       try {
-        const result = await postToLinkedIn(text, opts.account, opts.dataDir);
+        const result = await postToLinkedIn(text, opts.account, opts.dataDir, !!opts.force);
         console.log(`Posted: ${result.url}`);
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);

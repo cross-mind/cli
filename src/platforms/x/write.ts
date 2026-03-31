@@ -12,6 +12,7 @@ import { xRequest } from '../../http/x-client.js';
 import { loadXCredentials } from '../../auth/x.js';
 import { checkWriteLimit, writeDelay } from '../../http/rate-limiter.js';
 import { AuthError } from '../../http/client.js';
+import { checkWriteDuplicate, recordWrite } from '../../http/write-history.js';
 import {
   isCookieClientAvailable,
   bridgeReply,
@@ -92,9 +93,14 @@ export async function postTweet(
   text: string,
   account?: string,
   dataDir?: string,
-  mediaIds?: string[]
+  mediaIds?: string[],
+  force?: boolean
 ): Promise<WriteResult> {
   await checkWriteLimit('x', 'post', dataDir);
+  if (!force) {
+    const dup = await checkWriteDuplicate('x', 'tweet', text, undefined, dataDir);
+    if (dup.blocked) throw new Error(dup.reason);
+  }
   const creds = await getXCreds(account, dataDir);
   await writeDelay();
 
@@ -108,6 +114,7 @@ export async function postTweet(
     { method: 'POST', creds, body }
   );
 
+  await recordWrite('x', 'tweet', text, undefined, dataDir);
   return {
     success: true,
     id: data.data.id,
@@ -121,9 +128,14 @@ export async function replyToTweet(
   tweetId: string,
   account?: string,
   dataDir?: string,
-  mediaIds?: string[]
+  mediaIds?: string[],
+  force?: boolean
 ): Promise<WriteResult> {
   await checkWriteLimit('x', 'reply', dataDir);
+  if (!force) {
+    const dup = await checkWriteDuplicate('x', 'reply', text, tweetId, dataDir);
+    if (dup.blocked) throw new Error(dup.reason);
+  }
   const creds = await getXCreds(account, dataDir);
   await writeDelay();
 
@@ -136,6 +148,7 @@ export async function replyToTweet(
       '/2/tweets',
       { method: 'POST', creds, body }
     );
+    await recordWrite('x', 'reply', text, tweetId, dataDir);
     return {
       success: true,
       id: data.data.id,
@@ -158,6 +171,7 @@ export async function replyToTweet(
         );
       }
       const result = await bridgeReply(tweetId, text, creds as { authToken: string; ct0: string });
+      await recordWrite('x', 'reply', text, tweetId, dataDir);
       return {
         success: true,
         id: result.id,
@@ -252,9 +266,14 @@ export async function sendDM(
   username: string,
   text: string,
   account?: string,
-  dataDir?: string
+  dataDir?: string,
+  force?: boolean
 ): Promise<WriteResult> {
   await checkWriteLimit('x', 'dm', dataDir);
+  if (!force) {
+    const dup = await checkWriteDuplicate('x', 'dm', text, username, dataDir);
+    if (dup.blocked) throw new Error(dup.reason);
+  }
   const creds = await getXCreds(account, dataDir);
   await writeDelay();
 
@@ -295,6 +314,7 @@ export async function sendDM(
     throw err;
   }
 
+  await recordWrite('x', 'dm', text, username, dataDir);
   return {
     success: true,
     id: data.data.dm_conversation_id,
@@ -327,9 +347,14 @@ export async function quoteTweet(
   tweetId: string,
   text: string,
   account?: string,
-  dataDir?: string
+  dataDir?: string,
+  force?: boolean
 ): Promise<WriteResult> {
   await checkWriteLimit('x', 'post', dataDir);
+  if (!force) {
+    const dup = await checkWriteDuplicate('x', 'quote', text, tweetId, dataDir);
+    if (dup.blocked) throw new Error(dup.reason);
+  }
   const creds = await getXCreds(account, dataDir);
   await writeDelay();
 
@@ -338,6 +363,7 @@ export async function quoteTweet(
     { method: 'POST', creds, body: { text, quote_tweet_id: tweetId } }
   );
 
+  await recordWrite('x', 'quote', text, tweetId, dataDir);
   return {
     success: true,
     id: data.data.id,

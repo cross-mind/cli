@@ -317,7 +317,8 @@ export function registerX(program: Command): void {
     .option('--account <name>', 'Account to use')
     .option('--data-dir <dir>', 'Data directory override')
     .option('--media <paths...>', 'Attach image(s) (path or URL, multiple allowed)')
-    .action(async (text: string, opts: { account?: string; dataDir?: string; media?: string[] }) => {
+    .option('-f, --force', 'Skip duplicate content check')
+    .action(async (text: string, opts: { account?: string; dataDir?: string; media?: string[]; force?: boolean }) => {
       try {
         let mediaIds: string[] | undefined;
         if (opts.media?.length) {
@@ -327,7 +328,7 @@ export function registerX(program: Command): void {
             mediaIds.push(id);
           }
         }
-        const result = await postTweet(text, opts.account, opts.dataDir, mediaIds);
+        const result = await postTweet(text, opts.account, opts.dataDir, mediaIds, !!opts.force);
         console.log(result.message);
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -341,7 +342,8 @@ export function registerX(program: Command): void {
     .option('--account <name>', 'Account to use')
     .option('--data-dir <dir>', 'Data directory override')
     .option('--media <paths...>', 'Attach image(s) (path or URL, multiple allowed)')
-    .action(async (tweetId: string, text: string, opts: { account?: string; dataDir?: string; media?: string[] }) => {
+    .option('-f, --force', 'Skip duplicate content check')
+    .action(async (tweetId: string, text: string, opts: { account?: string; dataDir?: string; media?: string[]; force?: boolean }) => {
       try {
         let mediaIds: string[] | undefined;
         if (opts.media?.length) {
@@ -351,7 +353,7 @@ export function registerX(program: Command): void {
             mediaIds.push(id);
           }
         }
-        const result = await replyToTweet(text, tweetId, opts.account, opts.dataDir, mediaIds);
+        const result = await replyToTweet(text, tweetId, opts.account, opts.dataDir, mediaIds, !!opts.force);
         console.log(result.message);
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -409,9 +411,10 @@ export function registerX(program: Command): void {
     .description('Send a direct message')
     .option('--account <name>', 'Account to use')
     .option('--data-dir <dir>', 'Data directory override')
-    .action(async (username: string, text: string, opts: { account?: string; dataDir?: string }) => {
+    .option('-f, --force', 'Skip duplicate content check')
+    .action(async (username: string, text: string, opts: { account?: string; dataDir?: string; force?: boolean }) => {
       try {
-        const result = await sendDM(username, text, opts.account, opts.dataDir);
+        const result = await sendDM(username, text, opts.account, opts.dataDir, !!opts.force);
         console.log(result.message);
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -439,9 +442,10 @@ export function registerX(program: Command): void {
     .description('Quote-tweet')
     .option('--account <name>', 'Account to use')
     .option('--data-dir <dir>', 'Data directory override')
-    .action(async (tweetId: string, text: string, opts: { account?: string; dataDir?: string }) => {
+    .option('-f, --force', 'Skip duplicate content check')
+    .action(async (tweetId: string, text: string, opts: { account?: string; dataDir?: string; force?: boolean }) => {
       try {
-        const result = await quoteTweet(tweetId, text, opts.account, opts.dataDir);
+        const result = await quoteTweet(tweetId, text, opts.account, opts.dataDir, !!opts.force);
         console.log(result.message);
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);

@@ -278,9 +278,10 @@ export function registerReddit(program: Command): void {
     .description('Submit a comment (parent_id: t3_<post_id> or t1_<comment_id>)')
     .option('--account <name>', 'Account to use')
     .option('--data-dir <dir>', 'Data directory override')
-    .action(async (parentId: string, text: string, opts: { account?: string; dataDir?: string }) => {
+    .option('-f, --force', 'Skip duplicate content check')
+    .action(async (parentId: string, text: string, opts: { account?: string; dataDir?: string; force?: boolean }) => {
       try {
-        const result = await submitComment(parentId, text, opts.account, opts.dataDir);
+        const result = await submitComment(parentId, text, opts.account, opts.dataDir, !!opts.force);
         console.log(result.message);
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -353,9 +354,10 @@ export function registerReddit(program: Command): void {
     .description('Submit a link post to a subreddit')
     .option('--account <name>', 'Account to use')
     .option('--data-dir <dir>', 'Data directory override')
-    .action(async (subreddit: string, title: string, url: string, opts: { account?: string; dataDir?: string }) => {
+    .option('-f, --force', 'Skip duplicate content check')
+    .action(async (subreddit: string, title: string, url: string, opts: { account?: string; dataDir?: string; force?: boolean }) => {
       try {
-        const result = await submitPost(subreddit, title, url, opts.account, opts.dataDir);
+        const result = await submitPost(subreddit, title, url, opts.account, opts.dataDir, !!opts.force);
         console.log(result.message);
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -368,9 +370,10 @@ export function registerReddit(program: Command): void {
     .description('Submit a text (self) post to a subreddit')
     .option('--account <name>', 'Account to use')
     .option('--data-dir <dir>', 'Data directory override')
-    .action(async (subreddit: string, title: string, text: string, opts: { account?: string; dataDir?: string }) => {
+    .option('-f, --force', 'Skip duplicate content check')
+    .action(async (subreddit: string, title: string, text: string, opts: { account?: string; dataDir?: string; force?: boolean }) => {
       try {
-        const result = await submitTextPost(subreddit, title, text, opts.account, opts.dataDir);
+        const result = await submitTextPost(subreddit, title, text, opts.account, opts.dataDir, !!opts.force);
         console.log(result.message);
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -383,9 +386,10 @@ export function registerReddit(program: Command): void {
     .description('Crosspost to another subreddit (post_id: bare ID or t3_xxx)')
     .option('--account <name>', 'Account to use')
     .option('--data-dir <dir>', 'Data directory override')
-    .action(async (targetSub: string, postId: string, title: string, opts: { account?: string; dataDir?: string }) => {
+    .option('-f, --force', 'Skip duplicate content check')
+    .action(async (targetSub: string, postId: string, title: string, opts: { account?: string; dataDir?: string; force?: boolean }) => {
       try {
-        const result = await crosspost(targetSub, postId, title, opts.account, opts.dataDir);
+        const result = await crosspost(targetSub, postId, title, opts.account, opts.dataDir, !!opts.force);
         console.log(result.message);
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);

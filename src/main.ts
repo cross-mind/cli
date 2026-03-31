@@ -27,6 +27,7 @@ import { registerLinkedIn } from './platforms/linkedin/index.js';
 import { registerAuthCommands } from './commands/auth.js';
 import { registerAccountCommands } from './commands/account.js';
 import { registerExtractCookieCommand } from './commands/extract-cookie.js';
+import { registerConfigCommands } from './commands/config.js';
 import { createRequire } from 'module';
 
 const _require = createRequire(import.meta.url);
@@ -80,6 +81,7 @@ registerLinkedIn(program);
 registerAuthCommands(program);
 registerAccountCommands(program);
 registerExtractCookieCommand(program);
+registerConfigCommands(program);
 
 // ── Parse ──────────────────────────────────────────────────────────────────
 program.parseAsync(process.argv).catch((err: unknown) => {

@@ -19,7 +19,7 @@ Most social CLIs are built for humans. crossmind is built for AI agents:
 - **Compact output by default** — single-line `key:value` format, no emoji, no decorative whitespace
 - **`--json` for structured pipelines** — clean arrays with no outer wrapper
 - **No-auth first** — public platforms work out of the box, no configuration required
-- **Built-in write safety** — daily limits, random jitter delays, exponential backoff
+- **Built-in write safety** — daily limits, write dedup, DM frequency control, random jitter delays, exponential backoff
 
 ## Token Benchmark
 
@@ -428,7 +428,7 @@ If you're using OpenClaw and want a lighter path for programmatic social access:
 |---|---|---|
 | Install | `npm install -g crossmind` | Agent config + workflow setup |
 | Output | Token-efficient single-line or `--json` | JSON |
-| Write safety | Built-in daily limits + jitter | Manual configuration |
+| Write safety | Daily limits + dedup + DM frequency + jitter | Manual configuration |
 | No-auth platforms | Works out of the box (HN, Reddit read, GitHub, arXiv) | Requires connector setup |
 | Managed option | [crossmind.io](https://crossmind.io) — zero config, full strategy | — |
 
@@ -441,10 +441,31 @@ Write operations have multi-layer protection to prevent account bans:
 | Protection       | Details                                                    |
 |------------------|------------------------------------------------------------|
 | Daily limits     | Per-operation caps (post: 10/day, reply: 30, like: 100)    |
+| Write dedup      | Blocks duplicate or near-duplicate content within a configurable window (default 48h) |
+| DM frequency     | Prevents repeated DMs to the same user within the window — shows previous message for quick review |
 | Random jitter    | 1.5–4s random delay between write ops                      |
 | Exponential backoff | Auto-retry with backoff on 429 rate limit responses     |
 | OAuth writes     | All writes use official OAuth API paths, not UI simulation |
 | Revocable tokens | OAuth tokens can be revoked independently from the account |
+
+All write commands accept `-f` / `--force` to override dedup checks when needed.
+
+### Dedup Configuration
+
+Write history is stored in `$CROSSMIND_DATA_DIR/write-history.json`. Configure behavior via:
+
+```bash
+crossmind config show                           # View current settings
+crossmind config set dedup.window 72            # 72-hour dedup window
+crossmind config set dedup.threshold_long 0.6   # Long text similarity threshold (≥30 chars)
+crossmind config set dedup.threshold_short 0.5  # Short text similarity threshold (<30 chars)
+crossmind config set dedup.enabled false        # Disable dedup entirely
+```
+
+**How it works:**
+- **Broadcast actions** (tweet, post, quote) — checked globally across all targets. Jaccard similarity between new content and recent writes.
+- **Targeted actions** (reply, DM, comment) — checked per-target only. Different targets don't cross-contaminate.
+- **DM special rule** — any DM to the same user within the window is blocked, regardless of content. The block message includes the full previous message for quick review.
 
 ## How X Auth Works Internally
 

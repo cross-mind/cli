@@ -11,6 +11,7 @@ import {
   loadRedditCredentials, REDDIT_API, redditHeaders, redditCookieHeaders,
 } from '../../auth/reddit.js';
 import { checkWriteLimit, writeDelay } from '../../http/rate-limiter.js';
+import { checkWriteDuplicate, recordWrite } from '../../http/write-history.js';
 
 export interface RedditWriteResult {
   success: boolean;
@@ -68,9 +69,14 @@ export async function submitComment(
   parentId: string,   // t3_<postId> or t1_<commentId>
   text: string,
   account?: string,
-  dataDir?: string
+  dataDir?: string,
+  force?: boolean
 ): Promise<RedditWriteResult> {
   await checkWriteLimit('reddit', 'comment', dataDir);
+  if (!force) {
+    const dup = await checkWriteDuplicate('reddit', 'comment', text, parentId, dataDir);
+    if (dup.blocked) throw new Error(dup.reason);
+  }
   const { baseUrl, headers } = await getWriteConfig(account, dataDir);
   await writeDelay();
 
@@ -90,6 +96,7 @@ export async function submitComment(
   );
 
   const commentId = data?.json?.data?.things?.[0]?.data?.id ?? '';
+  await recordWrite('reddit', 'comment', text, parentId, dataDir);
   return {
     success: true,
     id: commentId,
@@ -201,9 +208,14 @@ export async function submitTextPost(
   title: string,
   text: string,
   account?: string,
-  dataDir?: string
+  dataDir?: string,
+  force?: boolean
 ): Promise<RedditWriteResult> {
   await checkWriteLimit('reddit', 'comment', dataDir);
+  if (!force) {
+    const dup = await checkWriteDuplicate('reddit', 'text-post', `${title} ${text}`, subreddit, dataDir);
+    if (dup.blocked) throw new Error(dup.reason);
+  }
   const { baseUrl, headers } = await getWriteConfig(account, dataDir);
   await writeDelay();
 
@@ -225,6 +237,7 @@ export async function submitTextPost(
   );
 
   const postId = data?.json?.data?.id ?? '';
+  await recordWrite('reddit', 'text-post', `${title} ${text}`, subreddit, dataDir);
   return {
     success: true,
     id: postId,
@@ -238,9 +251,14 @@ export async function submitPost(
   title: string,
   url: string,
   account?: string,
-  dataDir?: string
+  dataDir?: string,
+  force?: boolean
 ): Promise<RedditWriteResult> {
   await checkWriteLimit('reddit', 'comment', dataDir);
+  if (!force) {
+    const dup = await checkWriteDuplicate('reddit', 'post', title, subreddit, dataDir);
+    if (dup.blocked) throw new Error(dup.reason);
+  }
   const { baseUrl, headers } = await getWriteConfig(account, dataDir);
   await writeDelay();
 
@@ -263,6 +281,7 @@ export async function submitPost(
   );
 
   const postId = data?.json?.data?.id ?? '';
+  await recordWrite('reddit', 'post', title, subreddit, dataDir);
   return {
     success: true,
     id: postId,
@@ -276,9 +295,14 @@ export async function crosspost(
   postId: string,
   title: string,
   account?: string,
-  dataDir?: string
+  dataDir?: string,
+  force?: boolean
 ): Promise<RedditWriteResult> {
   await checkWriteLimit('reddit', 'comment', dataDir);
+  if (!force) {
+    const dup = await checkWriteDuplicate('reddit', 'crosspost', title, targetSubreddit, dataDir);
+    if (dup.blocked) throw new Error(dup.reason);
+  }
   const { baseUrl, headers } = await getWriteConfig(account, dataDir);
   await writeDelay();
 
@@ -303,6 +327,7 @@ export async function crosspost(
   );
 
   const newId = data?.json?.data?.id ?? '';
+  await recordWrite('reddit', 'crosspost', title, targetSubreddit, dataDir);
   return {
     success: true,
     id: newId,
