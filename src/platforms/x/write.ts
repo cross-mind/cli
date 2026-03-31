@@ -18,6 +18,7 @@ import {
   bridgeBookmark,
   bridgeUnbookmark,
 } from '../../http/x-bridge.js';
+import fs from 'node:fs';
 
 /** Load and validate X credentials. Accepts OAuth OR cookie auth. */
 async function getXCreds(account?: string, dataDir?: string) {
@@ -47,25 +48,70 @@ export interface WriteResult {
   message: string;
 }
 
+/** Upload a media file (image/gif/video) and return the media_id. Requires OAuth. */
+export async function uploadMedia(
+  filePath: string,
+  account?: string,
+  dataDir?: string
+): Promise<string> {
+  const creds = await getXCreds(account, dataDir);
+  if (!creds.accessToken) {
+    throw new AuthError('Media upload requires OAuth auth (X_ACCESS_TOKEN).');
+  }
+
+  const resolvedPath = filePath.startsWith('http') ? filePath : filePath;
+  const buffer = fs.readFileSync(resolvedPath);
+  const ext = resolvedPath.split('.').pop()?.toLowerCase() ?? '';
+  const mediaType = ext === 'gif' ? 'image/gif' : ext === 'mp4' ? 'video/mp4' : 'image/png';
+
+  const formData = new FormData();
+  formData.append('media', new Blob([buffer], { type: mediaType }), resolvedPath.split('/').pop());
+  formData.append('media_category', mediaType.startsWith('video') ? 'tweet_video' : 'tweet_image');
+
+  const res = await fetch('https://api.twitter.com/2/media/upload', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${creds.accessToken}`,
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      'Referer': 'https://twitter.com/',
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Media upload failed (${res.status}): ${body}`);
+  }
+
+  const data = await res.json() as { data: { media_key: string } };
+  return data.data.media_key;
+}
+
 /** Post a new tweet */
 export async function postTweet(
   text: string,
   account?: string,
-  dataDir?: string
+  dataDir?: string,
+  mediaIds?: string[]
 ): Promise<WriteResult> {
   await checkWriteLimit('x', 'post', dataDir);
   const creds = await getXCreds(account, dataDir);
   await writeDelay();
 
+  const body: Record<string, unknown> = { text };
+  if (mediaIds?.length) {
+    body.media = { media_ids: mediaIds };
+  }
+
   const data = await xRequest<{ data: { id: string; text: string } }>(
     '/2/tweets',
-    { method: 'POST', creds, body: { text } }
+    { method: 'POST', creds, body }
   );
 
   return {
     success: true,
     id: data.data.id,
-    message: `posted:${data.data.id} text:${text.slice(0, 50)}${text.length > 50 ? '...' : ''}`,
+    message: `posted:${data.data.id} text:${text.slice(0, 50)}${text.length > 50 ? '...' : ''}${mediaIds?.length ? ` media:${mediaIds.length}` : ''}`,
   };
 }
 
@@ -74,25 +120,26 @@ export async function replyToTweet(
   text: string,
   tweetId: string,
   account?: string,
-  dataDir?: string
+  dataDir?: string,
+  mediaIds?: string[]
 ): Promise<WriteResult> {
   await checkWriteLimit('x', 'reply', dataDir);
   const creds = await getXCreds(account, dataDir);
   await writeDelay();
 
   try {
+    const body: Record<string, unknown> = { text, reply: { in_reply_to_tweet_id: tweetId } };
+    if (mediaIds?.length) {
+      body.media = { media_ids: mediaIds };
+    }
     const data = await xRequest<{ data: { id: string } }>(
       '/2/tweets',
-      {
-        method: 'POST',
-        creds,
-        body: { text, reply: { in_reply_to_tweet_id: tweetId } },
-      }
+      { method: 'POST', creds, body }
     );
     return {
       success: true,
       id: data.data.id,
-      message: `replied:${data.data.id} to:${tweetId}`,
+      message: `replied:${data.data.id} to:${tweetId}${mediaIds?.length ? ` media:${mediaIds.length}` : ''}`,
     };
   } catch (err) {
     // Free tier API often returns 403 for cold replies (no prior engagement).

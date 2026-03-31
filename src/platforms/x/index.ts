@@ -13,6 +13,7 @@ import {
 import {
   postTweet, replyToTweet, likeTweet, retweetTweet, followUser, sendDM, deleteTweet,
   quoteTweet, unlikeTweet, unretweetTweet, unfollowUser, bookmarkTweet, unbookmarkTweet,
+  uploadMedia,
 } from './write.js';
 import { printOutput } from '../../output/formatter.js';
 
@@ -315,9 +316,18 @@ export function registerX(program: Command): void {
     .description('Post a new tweet')
     .option('--account <name>', 'Account to use')
     .option('--data-dir <dir>', 'Data directory override')
-    .action(async (text: string, opts: { account?: string; dataDir?: string }) => {
+    .option('--media <paths...>', 'Attach image(s) (path or URL, multiple allowed)')
+    .action(async (text: string, opts: { account?: string; dataDir?: string; media?: string[] }) => {
       try {
-        const result = await postTweet(text, opts.account, opts.dataDir);
+        let mediaIds: string[] | undefined;
+        if (opts.media?.length) {
+          mediaIds = [];
+          for (const p of opts.media) {
+            const id = await uploadMedia(p, opts.account, opts.dataDir);
+            mediaIds.push(id);
+          }
+        }
+        const result = await postTweet(text, opts.account, opts.dataDir, mediaIds);
         console.log(result.message);
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
@@ -330,9 +340,18 @@ export function registerX(program: Command): void {
     .description('Reply to a tweet')
     .option('--account <name>', 'Account to use')
     .option('--data-dir <dir>', 'Data directory override')
-    .action(async (tweetId: string, text: string, opts: { account?: string; dataDir?: string }) => {
+    .option('--media <paths...>', 'Attach image(s) (path or URL, multiple allowed)')
+    .action(async (tweetId: string, text: string, opts: { account?: string; dataDir?: string; media?: string[] }) => {
       try {
-        const result = await replyToTweet(text, tweetId, opts.account, opts.dataDir);
+        let mediaIds: string[] | undefined;
+        if (opts.media?.length) {
+          mediaIds = [];
+          for (const p of opts.media) {
+            const id = await uploadMedia(p, opts.account, opts.dataDir);
+            mediaIds.push(id);
+          }
+        }
+        const result = await replyToTweet(text, tweetId, opts.account, opts.dataDir, mediaIds);
         console.log(result.message);
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
