@@ -35,7 +35,7 @@ Auth requirements:
   Public bearer:               search only
 
   Get cookie:  crossmind extract-cookie x
-  Get OAuth:   crossmind auth login x (requires X_CLIENT_ID)
+  Get OAuth:   crossmind auth login x --access-token <token>
 `);
 
   // ── Read commands ──────────────────────────────────────────────

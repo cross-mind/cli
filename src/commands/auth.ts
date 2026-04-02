@@ -170,43 +170,29 @@ export function registerAuthCommands(program: Command): void {
 How to get credentials:
 
   X (Twitter):
-    Cookie:
-      crossmind extract-cookie x
-      (Headless if session exists, --headed for first-time login)
+    crossmind extract-cookie x
+    (Headless if session exists, --headed for first-time login)
 
-      Or copy manually from DevTools:
+    Or copy manually from DevTools:
       Browser → DevTools → Application → Cookies → x.com
 
-    OAuth access token:
-      Browser OAuth flow (requires Developer App):
-        export X_CLIENT_ID=<your_client_id>
-        crossmind auth login x
-
-      Or provide existing token:
-        crossmind auth login x --access-token <token>
+    Or provide OAuth token directly:
+      crossmind auth login x --access-token <token>
 
   Reddit:
-    Cookie:
-      crossmind extract-cookie reddit
+    crossmind extract-cookie reddit
 
-      Or copy manually from DevTools:
+    Or copy manually from DevTools:
       Browser → DevTools → Application → Cookies → reddit.com
-
-    OAuth access token:
-      Browser OAuth flow (requires Developer App):
-        export REDDIT_CLIENT_ID=<your_client_id>
-        crossmind auth login reddit
 
 Examples:
   crossmind extract-cookie x
   crossmind extract-cookie x --headed
   crossmind auth login x --auth-token <val> --ct0 <val>
   crossmind auth login x --access-token <val>
-  export X_CLIENT_ID=xxx && crossmind auth login x
 
   crossmind extract-cookie reddit
   crossmind auth login reddit --session-cookie <val>
-  export REDDIT_CLIENT_ID=xxx && crossmind auth login reddit
 `);
 
   // auth logout <platform> [account]

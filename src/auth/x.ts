@@ -37,9 +37,9 @@ const X_OAUTH_CONFIG: OAuthConfig = {
 export async function loginX(accountName: string, dataDir?: string): Promise<void> {
   if (X_CLIENT_ID === 'YOUR_X_CLIENT_ID') {
     throw new Error(
-      'X_CLIENT_ID is not set. To use the browser OAuth flow, register a Developer App first.\n' +
-      `Setup guide: ${DOCS_X_SETUP}\n\n` +
-      `Alternatively, get a ready-to-use token at ${CROSSMIND_IO} — no Developer App needed.`
+      'X_CLIENT_ID is not set.\n\n' +
+      'Recommended: extract session from your logged-in browser (no Developer App needed):\n' +
+      '  crossmind extract-cookie x'
     );
   }
 

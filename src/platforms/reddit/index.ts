@@ -30,7 +30,7 @@ Auth requirements:
   OAuth:                 comment, upvote, downvote, save, subscribe, post, text-post, crosspost, delete
 
   Get cookie:  crossmind extract-cookie reddit
-  Get OAuth:   crossmind auth login reddit (requires REDDIT_CLIENT_ID)
+  Get OAuth:   crossmind auth login reddit --session-cookie <val>
 `);
 
   // ── Read commands ──────────────────────────────────────────────

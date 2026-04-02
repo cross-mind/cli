@@ -214,7 +214,16 @@ const PROFILE_TEMPLATE = '{rank}. {full_name} ({headline}) connections:{connecti
 export function registerLinkedIn(program: Command): void {
   const li = program
     .command('li')
-    .description('LinkedIn — post, profile, feed');
+    .description('LinkedIn — post, profile, feed')
+    .addHelpText('after', `
+
+Auth requirements:
+  Cookie:            profile, feed (read operations)
+  OAuth (access_token):  post, delete (write operations)
+
+  Get cookie:  crossmind extract-cookie linkedin
+  Get OAuth:   crossmind auth login linkedin --access-token <token>
+`);
 
   li
     .command('profile <username>')

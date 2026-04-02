@@ -38,6 +38,14 @@ export type RedditCredentials =
  * Run the Reddit OAuth 2.0 PKCE flow.
  */
 export async function loginReddit(accountName: string, dataDir?: string): Promise<void> {
+  if (REDDIT_CLIENT_ID === 'YOUR_REDDIT_CLIENT_ID') {
+    throw new Error(
+      'REDDIT_CLIENT_ID is not set.\n\n' +
+      'Recommended: extract session from your logged-in browser (no Developer App needed):\n' +
+      '  crossmind extract-cookie reddit'
+    );
+  }
+
   const verifier = generateCodeVerifier();
   const challenge = generateCodeChallenge(verifier);
   const state = generateState();
