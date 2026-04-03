@@ -12,6 +12,16 @@ import {
   loadRedditCredentials, REDDIT_API,
   redditHeaders, redditCookieHeaders, redditPublicHeaders,
 } from '../../auth/reddit.js';
+import {
+  bridgeSubreddit, bridgeSearch, bridgeUser, bridgeUserPosts, bridgePost as bridgePostFetch,
+  bridgeHome, bridgeSaved,
+  type RedditCookieCreds,
+} from '../../http/reddit-bridge.js';
+
+/** Convert stored cookie credentials to bridge format. */
+function cookieCreds(c: { session: string; modhash?: string; csrfToken?: string; loid?: string }): RedditCookieCreds {
+  return { session: c.session, csrfToken: c.csrfToken, loid: c.loid, modhash: c.modhash };
+}
 
 export interface RedditPost {
   rank: number;
@@ -87,6 +97,10 @@ export async function getSubreddit(
   account?: string,
   dataDir?: string
 ): Promise<RedditPost[]> {
+  const creds = await loadRedditCredentials(account, dataDir);
+  if (creds?.type === 'cookie') {
+    return bridgeSubreddit(subreddit, sort, limit, cookieCreds(creds));
+  }
   const { baseUrl, headers } = await resolveAuth(account, dataDir);
   const timeParam = sort === 'top' ? `&t=${time}` : '';
   const url = `${baseUrl}/r/${subreddit}/${sort}.json?limit=${Math.min(limit, 100)}${timeParam}`;
@@ -103,6 +117,10 @@ export async function searchReddit(
   account?: string,
   dataDir?: string
 ): Promise<RedditPost[]> {
+  const creds = await loadRedditCredentials(account, dataDir);
+  if (creds?.type === 'cookie') {
+    return bridgeSearch(query, subreddit, sort, limit, cookieCreds(creds));
+  }
   const { baseUrl, headers } = await resolveAuth(account, dataDir);
   const subredditPath = subreddit ? `/r/${subreddit}` : '';
   const url = `${baseUrl}${subredditPath}/search.json?q=${encodeURIComponent(query)}&sort=${sort}&limit=${Math.min(limit, 100)}&restrict_sr=${subreddit ? 'true' : 'false'}`;
@@ -190,6 +208,10 @@ export async function getRedditUserProfile(
   account?: string,
   dataDir?: string
 ): Promise<RedditUserProfile> {
+  const creds = await loadRedditCredentials(account, dataDir);
+  if (creds?.type === 'cookie') {
+    return bridgeUser(username, cookieCreds(creds));
+  }
   const { baseUrl, headers } = await resolveAuth(account, dataDir);
   const data = await request<{ data: Record<string, unknown> }>(
     `${baseUrl}/user/${username}/about.json`,
@@ -215,6 +237,10 @@ export async function getUserPosts(
   account?: string,
   dataDir?: string
 ): Promise<RedditPost[]> {
+  const creds = await loadRedditCredentials(account, dataDir);
+  if (creds?.type === 'cookie') {
+    return bridgeUserPosts(username, limit, cookieCreds(creds));
+  }
   const { baseUrl, headers } = await resolveAuth(account, dataDir);
   const url = `${baseUrl}/user/${username}/submitted.json?sort=${sort}&limit=${Math.min(limit, 100)}`;
   const data = await request<{ data: { children: Record<string, unknown>[] } }>(url, { headers });
@@ -260,6 +286,12 @@ export async function getPost(
   account?: string,
   dataDir?: string
 ): Promise<RedditPostDetail> {
+  const creds = await loadRedditCredentials(account, dataDir);
+  if (creds?.type === 'cookie') {
+    // bridge uses subreddit='' — reddit-fetch.py fetches from /comments/<id>.json
+    const id = postId.replace(/^t3_/, '');
+    return bridgePostFetch('', id, limit, cookieCreds(creds));
+  }
   const { baseUrl, headers } = await resolveAuth(account, dataDir);
   // Strip t3_ prefix if present
   const id = postId.replace(/^t3_/, '');
@@ -306,6 +338,10 @@ export async function getHomeFeed(
   account?: string,
   dataDir?: string
 ): Promise<RedditPost[]> {
+  const creds = await loadRedditCredentials(account, dataDir);
+  if (creds?.type === 'cookie') {
+    return bridgeHome(limit, cookieCreds(creds));
+  }
   const { baseUrl, headers } = await resolveAuth(account, dataDir);
   if (baseUrl === 'https://www.reddit.com' && !headers['Cookie'] && !headers['Authorization']) {
     throw new Error('Home feed requires Reddit auth. Run: crossmind auth login reddit');
@@ -322,6 +358,10 @@ export async function getSaved(
   account?: string,
   dataDir?: string
 ): Promise<RedditPost[]> {
+  const creds = await loadRedditCredentials(account, dataDir);
+  if (creds?.type === 'cookie') {
+    return bridgeSaved(limit, cookieCreds(creds));
+  }
   const { baseUrl, headers } = await resolveAuth(account, dataDir);
   if (baseUrl === 'https://www.reddit.com' && !headers['Cookie'] && !headers['Authorization']) {
     throw new Error('Saved requires Reddit auth. Run: crossmind auth login reddit');
@@ -346,6 +386,11 @@ export async function getPostComments(
   account?: string,
   dataDir?: string
 ): Promise<RedditComment[]> {
+  const creds = await loadRedditCredentials(account, dataDir);
+  if (creds?.type === 'cookie') {
+    const detail = await bridgePostFetch(subreddit, postId, limit, cookieCreds(creds));
+    return detail.comments;
+  }
   const { baseUrl, headers } = await resolveAuth(account, dataDir);
   const url = `${baseUrl}/r/${subreddit}/comments/${postId}.json?limit=${Math.min(limit, 100)}`;
   const data = await request<[unknown, { data: { children: Record<string, unknown>[] } }]>(url, { headers });

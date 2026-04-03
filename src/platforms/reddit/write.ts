@@ -12,6 +12,18 @@ import {
 } from '../../auth/reddit.js';
 import { checkWriteLimit, writeDelay } from '../../http/rate-limiter.js';
 import { checkWriteDuplicate, recordWrite } from '../../http/write-history.js';
+import {
+  bridgeComment, bridgeVote, bridgeSaveItem,
+  bridgeSubscribe, bridgeUnsubscribe,
+  bridgeSubmitPost, bridgeLinkPost, bridgeCrosspost,
+  bridgeDelete,
+  type RedditCookieCreds,
+} from '../../http/reddit-bridge.js';
+
+/** Convert stored cookie credentials to bridge format. */
+function cookieCreds(c: { session: string; modhash?: string; csrfToken?: string; loid?: string }): RedditCookieCreds {
+  return { session: c.session, csrfToken: c.csrfToken, loid: c.loid, modhash: c.modhash };
+}
 
 export interface RedditWriteResult {
   success: boolean;
@@ -77,6 +89,15 @@ export async function submitComment(
     const dup = await checkWriteDuplicate('reddit', 'comment', text, parentId, dataDir);
     if (dup.blocked) throw new Error(dup.reason);
   }
+
+  const creds = await loadRedditCredentials(account, dataDir);
+  if (creds?.type === 'cookie') {
+    await writeDelay();
+    const { id } = await bridgeComment(parentId, text, cookieCreds(creds));
+    await recordWrite('reddit', 'comment', text, parentId, dataDir);
+    return { success: true, id, message: `commented:${id} on:${parentId}` };
+  }
+
   const { baseUrl, headers } = await getWriteConfig(account, dataDir);
   await writeDelay();
 
@@ -112,6 +133,15 @@ export async function vote(
   dataDir?: string
 ): Promise<RedditWriteResult> {
   await checkWriteLimit('reddit', 'upvote', dataDir);
+
+  const creds = await loadRedditCredentials(account, dataDir);
+  if (creds?.type === 'cookie') {
+    await writeDelay();
+    await bridgeVote(id, direction, cookieCreds(creds));
+    const dirLabel = direction === 1 ? 'upvoted' : direction === -1 ? 'downvoted' : 'unvoted';
+    return { success: true, message: `${dirLabel}:${id}` };
+  }
+
   const { baseUrl, headers } = await getWriteConfig(account, dataDir);
   await writeDelay();
 
@@ -136,6 +166,13 @@ export async function deleteItem(
   account?: string,
   dataDir?: string
 ): Promise<RedditWriteResult> {
+  const creds = await loadRedditCredentials(account, dataDir);
+  if (creds?.type === 'cookie') {
+    await writeDelay();
+    await bridgeDelete(id, cookieCreds(creds));
+    return { success: true, message: `deleted:${id}` };
+  }
+
   const { baseUrl, headers } = await getWriteConfig(account, dataDir);
   await writeDelay();
 
@@ -156,6 +193,14 @@ export async function saveItem(
   dataDir?: string
 ): Promise<RedditWriteResult> {
   await checkWriteLimit('reddit', 'save', dataDir);
+
+  const creds = await loadRedditCredentials(account, dataDir);
+  if (creds?.type === 'cookie') {
+    await writeDelay();
+    await bridgeSaveItem(id, cookieCreds(creds));
+    return { success: true, message: `saved:${id}` };
+  }
+
   const { baseUrl, headers } = await getWriteConfig(account, dataDir);
   await writeDelay();
 
@@ -177,6 +222,19 @@ export async function subscribeSubreddit(
   dataDir?: string
 ): Promise<RedditWriteResult> {
   await checkWriteLimit('reddit', 'subscribe', dataDir);
+
+  const creds = await loadRedditCredentials(account, dataDir);
+  if (creds?.type === 'cookie') {
+    await writeDelay();
+    if (action === 'sub') {
+      await bridgeSubscribe(subreddit, cookieCreds(creds));
+      return { success: true, message: `subscribed to:r/${subreddit}` };
+    } else {
+      await bridgeUnsubscribe(subreddit, cookieCreds(creds));
+      return { success: true, message: `unsubscribed from:r/${subreddit}` };
+    }
+  }
+
   const { baseUrl, headers } = await getWriteConfig(account, dataDir);
   await writeDelay();
 
@@ -216,6 +274,15 @@ export async function submitTextPost(
     const dup = await checkWriteDuplicate('reddit', 'text-post', `${title} ${text}`, subreddit, dataDir);
     if (dup.blocked) throw new Error(dup.reason);
   }
+
+  const creds = await loadRedditCredentials(account, dataDir);
+  if (creds?.type === 'cookie') {
+    await writeDelay();
+    const { id } = await bridgeSubmitPost(subreddit, title, text, cookieCreds(creds));
+    await recordWrite('reddit', 'text-post', `${title} ${text}`, subreddit, dataDir);
+    return { success: true, id, message: `text_post:${id} to:r/${subreddit}` };
+  }
+
   const { baseUrl, headers } = await getWriteConfig(account, dataDir);
   await writeDelay();
 
@@ -259,6 +326,15 @@ export async function submitPost(
     const dup = await checkWriteDuplicate('reddit', 'post', title, subreddit, dataDir);
     if (dup.blocked) throw new Error(dup.reason);
   }
+
+  const creds = await loadRedditCredentials(account, dataDir);
+  if (creds?.type === 'cookie') {
+    await writeDelay();
+    const { id } = await bridgeLinkPost(subreddit, title, url, cookieCreds(creds));
+    await recordWrite('reddit', 'post', title, subreddit, dataDir);
+    return { success: true, id, message: `submitted:${id} to:r/${subreddit}` };
+  }
+
   const { baseUrl, headers } = await getWriteConfig(account, dataDir);
   await writeDelay();
 
@@ -303,10 +379,18 @@ export async function crosspost(
     const dup = await checkWriteDuplicate('reddit', 'crosspost', title, targetSubreddit, dataDir);
     if (dup.blocked) throw new Error(dup.reason);
   }
+
+  const creds = await loadRedditCredentials(account, dataDir);
+  const bareId = postId.replace(/^t3_/, '');
+  if (creds?.type === 'cookie') {
+    await writeDelay();
+    const { id } = await bridgeCrosspost(targetSubreddit, title, `t3_${bareId}`, cookieCreds(creds));
+    await recordWrite('reddit', 'crosspost', title, targetSubreddit, dataDir);
+    return { success: true, id, message: `crossposted:t3_${bareId} to:r/${targetSubreddit} new_id:${id}` };
+  }
+
   const { baseUrl, headers } = await getWriteConfig(account, dataDir);
   await writeDelay();
-
-  const bareId = postId.replace(/^t3_/, '');
 
   const body = new URLSearchParams({
     api_type: 'json',
