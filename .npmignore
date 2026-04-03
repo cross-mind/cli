@@ -1,0 +1,8 @@
+**/__pycache__
+**/*.pyc
+**/*.pyo
+src/
+test/
+*.test.ts
+tsconfig.json
+.eslintrc*
