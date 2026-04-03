@@ -4,11 +4,13 @@
  */
 
 import { Command } from 'commander';
-import { loginX, saveCookieAuth, saveBearerToken, saveAccessToken } from '../auth/x.js';
-import { loginReddit, saveRedditCookies } from '../auth/reddit.js';
+import { loginX, saveCookieAuth, saveBearerToken, saveAccessToken, loadXCredentials } from '../auth/x.js';
+import { loginReddit, saveRedditCookies, loadRedditCredentials } from '../auth/reddit.js';
 import { loginBluesky } from '../auth/bluesky.js';
 import { saveGitHubToken } from '../auth/github.js';
-import { saveCredential, listAccounts, removeCredential, getDefaultAccount } from '../auth/store.js';
+import { saveCredential, listAccounts, removeCredential, getDefaultAccount, loadCredential, resolveAccount } from '../auth/store.js';
+import { isCookieClientAvailable } from '../http/x-bridge.js';
+import { isRedditClientAvailable } from '../http/reddit-bridge.js';
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 
@@ -209,24 +211,176 @@ Examples:
   // auth status
   auth
     .command('status')
-    .description('Show authentication status for all platforms')
+    .description('Show auth status and available operations for each platform')
     .option('--data-dir <dir>', 'Data directory override')
     .action(async (opts: { dataDir?: string }) => {
-      const accounts = await listAccounts(undefined, opts.dataDir);
-      if (accounts.length === 0) {
-        console.log('No accounts stored. Run: crossmind auth login <platform>');
-        return;
+      const tick  = '✓';
+      const cross = '✗';
+      const warn  = '⚠';
+      const sep   = '─'.repeat(60);
+
+      function credLine(label: string, ok: boolean, detail: string): string {
+        const mark = ok ? tick : cross;
+        const pad = ' '.repeat(Math.max(0, 28 - label.length));
+        return `  ${mark}  ${label}${pad}${detail}`;
       }
 
-      const byPlatform: Record<string, string[]> = {};
-      for (const a of accounts) {
-        (byPlatform[a.platform] ??= []).push(a.name);
+      function opList(ops: string[]): string[] {
+        // Wrap at ~70 chars
+        const lines: string[] = [];
+        let cur = '     ';
+        for (const op of ops) {
+          const add = (cur === '     ' ? '' : ', ') + op;
+          if (cur.length + add.length > 70) {
+            lines.push(cur);
+            cur = '     ' + op;
+          } else {
+            cur += add;
+          }
+        }
+        if (cur.trim()) lines.push(cur);
+        return lines;
       }
 
-      for (const [p, names] of Object.entries(byPlatform)) {
-        const def = await getDefaultAccount(p, opts.dataDir);
-        const list = names.map((n) => n + (n === def ? '*' : '')).join(', ');
-        console.log(`${p}: ${list}`);
+      // ── X (Twitter) ──────────────────────────────────────────────────────
+
+      const xAccountName = await resolveAccount('x', undefined, opts.dataDir);
+      const xCred = await loadCredential('x', xAccountName, opts.dataDir);
+
+      const xCookieStored = !!(xCred?.authToken && xCred?.ct0);
+      const xCookieEnv    = !!(process.env['X_AUTH_TOKEN'] && process.env['X_CT0']);
+      const hasCookie     = xCookieStored || xCookieEnv;
+      const cookieSrc     = xCookieStored ? 'stored' : xCookieEnv ? 'env var' : '';
+
+      const xOAuthStored = !!xCred?.accessToken;
+      const xOAuthEnv    = !!process.env['X_ACCESS_TOKEN'];
+      const hasOAuth     = xOAuthStored || xOAuthEnv;
+      const oauthSrc     = xOAuthStored ? 'stored' : xOAuthEnv ? 'env var' : '';
+
+      const xBridgeOk = hasCookie && await isCookieClientAvailable();
+
+      console.log(`\nX (Twitter)  ·  account: ${xAccountName}`);
+      console.log(credLine('Cookie (auth_token + ct0)', hasCookie,
+        hasCookie ? `${cookieSrc}` : 'not configured'));
+      console.log(credLine('OAuth (access_token)', hasOAuth,
+        hasOAuth ? `${oauthSrc}` : 'not configured'));
+      if (hasCookie) {
+        console.log(credLine('Bridge (Python + curl_cffi)', xBridgeOk,
+          xBridgeOk ? 'available' : 'not found — install: uv pip install curl_cffi'));
       }
+
+      if (!hasCookie && !hasOAuth) {
+        console.log(`\n  ${cross}  No credentials. Run: crossmind auth login x`);
+      } else {
+        // Compute available ops
+        const canRead: string[] = [];
+        const canWrite: string[] = [];
+        const limited: string[] = [];
+
+        // Read ops — all require at least one auth method for user context
+        canRead.push('search', 'profile', 'timeline', 'thread', 'followers', 'following', 'likes', 'list');
+        if (hasCookie || hasOAuth) canRead.push('home');
+        if (hasCookie && xBridgeOk) canRead.push('bookmarks', 'notifications');
+        if (hasOAuth) canRead.push('dm-list', 'analytics');
+
+        // Write ops
+        if ((hasCookie && xBridgeOk) || hasOAuth) {
+          canWrite.push('tweet', 'reply', 'like', 'unlike', 'retweet', 'unretweet', 'quote', 'delete');
+        }
+        if (hasCookie && xBridgeOk) canWrite.push('bookmark', 'unbookmark');
+        if (hasOAuth) {
+          canWrite.push('follow', 'unfollow', 'dm');
+        } else if (hasCookie && xBridgeOk) {
+          // follow/unfollow attempt cookie first but need OAuth for success
+          limited.push('follow/unfollow (requires OAuth or full browser cookie — not available with auth_token + ct0 only)');
+        }
+
+        console.log(`\n  Read   ${opList(canRead).join('\n         ')}`);
+        if (canWrite.length > 0) {
+          console.log(`  Write  ${opList(canWrite).join('\n         ')}`);
+        }
+        if (limited.length > 0) {
+          for (const l of limited) {
+            console.log(`  ${warn}  ${l}`);
+          }
+        }
+
+        // Recommendations
+        const recs: string[] = [];
+        if (hasCookie && !xBridgeOk) {
+          recs.push('Install Python + curl_cffi to unlock cookie-auth ops: uv pip install curl_cffi');
+        }
+        if (hasOAuth && !hasCookie) {
+          recs.push('Extract session cookies to unlock bookmarks, notifications, and remove API tier limits:');
+          recs.push('  crossmind extract-cookie x');
+        }
+        if (!hasOAuth && hasCookie) {
+          recs.push('No OAuth — follow/unfollow, dm, dm-list, analytics require OAuth access token');
+        }
+        if (recs.length > 0) {
+          console.log('');
+          for (const r of recs) console.log(`  ${warn}  ${r}`);
+        }
+      }
+
+      // ── Reddit ────────────────────────────────────────────────────────────
+
+      console.log(`\n${sep}`);
+
+      const redditAccountName = await resolveAccount('reddit', undefined, opts.dataDir);
+      let redditCreds: Awaited<ReturnType<typeof loadRedditCredentials>> = null;
+      try { redditCreds = await loadRedditCredentials(undefined, opts.dataDir); } catch { /* no creds */ }
+
+      const hasRedditCookie = redditCreds?.type === 'cookie';
+      const hasRedditOAuth  = redditCreds?.type === 'oauth';
+      const redditBridgeOk  = hasRedditCookie && await isRedditClientAvailable();
+
+      console.log(`\nReddit  ·  account: ${redditAccountName}`);
+      console.log(credLine('Cookie (reddit_session)', hasRedditCookie,
+        hasRedditCookie ? 'stored' : 'not configured'));
+      console.log(credLine('OAuth (access_token)', hasRedditOAuth,
+        hasRedditOAuth ? 'stored' : 'not configured'));
+      if (hasRedditCookie) {
+        console.log(credLine('Bridge (Python + curl_cffi)', redditBridgeOk,
+          redditBridgeOk ? 'available' : 'not found — install: uv pip install curl_cffi'));
+      }
+
+      if (!hasRedditCookie && !hasRedditOAuth) {
+        console.log(`\n  ${cross}  No credentials. Run: crossmind extract-cookie reddit`);
+      } else {
+        const redditRead: string[] = ['subreddit', 'search', 'comments', 'popular', 'all',
+          'user', 'user-posts', 'user-comments', 'read', 'sub-info'];
+        const redditWrite: string[] = [];
+
+        if (hasRedditCookie && redditBridgeOk) {
+          redditRead.push('home', 'saved');
+          redditWrite.push('comment', 'upvote', 'downvote', 'save', 'subscribe', 'unsubscribe',
+            'text-post', 'link-post', 'crosspost', 'delete');
+        } else if (hasRedditOAuth) {
+          redditRead.push('home', 'saved');
+          redditWrite.push('comment', 'upvote', 'downvote', 'save', 'subscribe', 'unsubscribe',
+            'text-post', 'link-post', 'crosspost', 'delete');
+        }
+
+        console.log(`\n  Read   ${opList(redditRead).join('\n         ')}`);
+        if (redditWrite.length > 0) {
+          console.log(`  Write  ${opList(redditWrite).join('\n         ')}`);
+        }
+
+        const redditRecs: string[] = [];
+        if (hasRedditCookie && !redditBridgeOk) {
+          redditRecs.push('Install Python + curl_cffi to unlock write ops: uv pip install curl_cffi');
+        }
+        if (hasRedditOAuth && !hasRedditCookie) {
+          redditRecs.push('Extract session cookies for better coverage (no OAuth rate limits):');
+          redditRecs.push('  crossmind extract-cookie reddit');
+        }
+        if (redditRecs.length > 0) {
+          console.log('');
+          for (const r of redditRecs) console.log(`  ${warn}  ${r}`);
+        }
+      }
+
+      console.log('');
     });
 }
