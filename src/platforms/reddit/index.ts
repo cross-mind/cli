@@ -25,12 +25,10 @@ export function registerReddit(program: Command): void {
     .addHelpText('after', `
 
 Auth requirements:
-  No auth:               r, search, comments, popular, all, user, user-posts, user-comments, read
-  Cookie or OAuth:       home, saved
-  OAuth:                 comment, upvote, downvote, save, subscribe, post, text-post, crosspost, delete
+  No auth:          r, search, comments, popular, all, user, user-posts, user-comments, read
+  Cookie:           home, saved, comment, upvote, downvote, save, subscribe, post, text-post, crosspost, delete
 
   Get cookie:  crossmind extract-cookie reddit
-  Get OAuth:   crossmind auth login reddit --session-cookie <val>
 `);
 
   // ── Read commands ──────────────────────────────────────────────
