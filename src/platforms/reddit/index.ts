@@ -1,7 +1,7 @@
 /**
  * Reddit platform commands.
  * Read: subreddit, popular, all, search, comments, post, sub-info, user, user-posts, user-comments, home, saved
- * Write: comment, vote, save, subscribe, post, text-post, crosspost, delete
+ * Write: comment, vote, save, subscribe, unsubscribe, post, text-post, crosspost, delete
  */
 
 import { Command } from 'commander';
@@ -26,7 +26,7 @@ export function registerReddit(program: Command): void {
 
 Auth requirements:
   No auth:          r, search, comments, popular, all, user, user-posts, user-comments, read
-  Cookie:           home, saved, comment, upvote, downvote, save, subscribe, post, text-post, crosspost, delete
+  Cookie:           home, saved, comment, upvote, downvote, save, subscribe, unsubscribe, post, text-post, crosspost, delete
 
   Get cookie:  crossmind extract-cookie reddit
 `);
@@ -350,6 +350,21 @@ Auth requirements:
     .action(async (subreddit: string, opts: { account?: string; dataDir?: string }) => {
       try {
         const result = await subscribeSubreddit(subreddit, 'sub', opts.account, opts.dataDir);
+        console.log(result.message);
+      } catch (err) {
+        console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+        process.exit(1);
+      }
+    });
+
+  reddit
+    .command('unsubscribe <subreddit>')
+    .description('Unsubscribe from a subreddit')
+    .option('--account <name>', 'Account to use')
+    .option('--data-dir <dir>', 'Data directory override')
+    .action(async (subreddit: string, opts: { account?: string; dataDir?: string }) => {
+      try {
+        const result = await subscribeSubreddit(subreddit, 'unsub', opts.account, opts.dataDir);
         console.log(result.message);
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);

@@ -286,6 +286,23 @@ export async function bridgeSearch(
   return (result.data ?? []).slice(0, limit).map((p, i) => mapCliPost(p, i + 1));
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Extract id from Reddit's `{ json: { errors, data } }` response.
+ * Throws if the errors array is non-empty.
+ */
+function extractJsonId(data: Record<string, unknown> | null, op: string): string {
+  const json = data?.['json'] as { errors?: [string, string, string][]; data?: { id?: string; things?: Array<{ data?: { id?: string } }> } } | undefined;
+  const errors = json?.errors;
+  if (errors && errors.length > 0) {
+    const [code, msg] = errors[0];
+    throw new Error(`Reddit ${op} error [${code}]: ${msg}`);
+  }
+  // submit returns json.data.id; comment returns json.data.things[0].data.id
+  return json?.data?.id ?? json?.data?.things?.[0]?.data?.id ?? '';
+}
+
 // ── Public API — Write ───────────────────────────────────────────────────────
 
 export async function bridgeComment(
@@ -297,9 +314,7 @@ export async function bridgeComment(
     creds, ['comment', parentId, text]
   );
   if (!result.ok) throw new Error(result.error?.message ?? 'Comment failed');
-  // reddit-fetch returns full API response; extract comment id from json.data.things if present
-  const things = (result.data as Record<string, unknown> | null)?.['json'] as { data?: { things?: Array<{ data?: { id?: string } }> } } | undefined;
-  const id = things?.data?.things?.[0]?.data?.id ?? '';
+  const id = extractJsonId(result.data as Record<string, unknown> | null, 'comment');
   return { id };
 }
 
@@ -339,8 +354,7 @@ export async function bridgeSubmitPost(
     creds, ['post', subreddit, title, body]
   );
   if (!result.ok) throw new Error(result.error?.message ?? 'Submit post failed');
-  const json = (result.data as Record<string, unknown> | null)?.['json'] as { data?: { id?: string } } | undefined;
-  const id = json?.data?.id ?? '';
+  const id = extractJsonId(result.data as Record<string, unknown> | null, 'text-post');
   return { id };
 }
 
@@ -354,8 +368,7 @@ export async function bridgeLinkPost(
     creds, ['link-post', subreddit, title, url]
   );
   if (!result.ok) throw new Error(result.error?.message ?? 'Submit link post failed');
-  const json = (result.data as Record<string, unknown> | null)?.['json'] as { data?: { id?: string } } | undefined;
-  const id = json?.data?.id ?? '';
+  const id = extractJsonId(result.data as Record<string, unknown> | null, 'link-post');
   return { id };
 }
 
@@ -369,8 +382,7 @@ export async function bridgeCrosspost(
     creds, ['crosspost', subreddit, title, crosspostFullname]
   );
   if (!result.ok) throw new Error(result.error?.message ?? 'Crosspost failed');
-  const json = (result.data as Record<string, unknown> | null)?.['json'] as { data?: { id?: string } } | undefined;
-  const id = json?.data?.id ?? '';
+  const id = extractJsonId(result.data as Record<string, unknown> | null, 'crosspost');
   return { id };
 }
 

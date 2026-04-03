@@ -247,6 +247,7 @@ def post_text(subreddit: str, title: str, body: str) -> Dict[str, Any]:
         "POST",
         "/api/submit",
         data={
+            "api_type": "json",
             "sr": subreddit,
             "title": title,
             "text": body,
@@ -267,6 +268,7 @@ def post_comment(parent_id: str, text: str) -> Dict[str, Any]:
         "POST",
         "/api/comment",
         data={
+            "api_type": "json",
             "parent": parent_id,
             "text": text,
             "uh": modhash,
@@ -373,6 +375,7 @@ def post_link(subreddit: str, title: str, url: str) -> Dict[str, Any]:
         "POST",
         "/api/submit",
         data={
+            "api_type": "json",
             "sr": subreddit,
             "title": title,
             "url": url,
@@ -394,6 +397,7 @@ def crosspost_item(subreddit: str, title: str, crosspost_fullname: str) -> Dict[
         "POST",
         "/api/submit",
         data={
+            "api_type": "json",
             "sr": subreddit,
             "title": title,
             "crosspost_fullname": crosspost_fullname,
