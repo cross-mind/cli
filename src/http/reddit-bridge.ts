@@ -61,6 +61,7 @@ export interface RedditCookieCreds {
   csrfToken?: string;
   loid?: string;
   modhash?: string;
+  proxy?: string;
 }
 
 // ── Response shapes ──────────────────────────────────────────────────────────
@@ -162,6 +163,7 @@ async function runFetch<T>(
     ...(creds.csrfToken ? { REDDIT_CSRF: creds.csrfToken } : {}),
     ...(creds.loid ? { REDDIT_LOID: creds.loid } : {}),
     ...(creds.modhash ? { REDDIT_MODHASH: creds.modhash } : {}),
+    ...(creds.proxy ? { REDDIT_PROXY: creds.proxy } : {}),
   };
 
   let stdout: string;

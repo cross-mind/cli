@@ -10,6 +10,7 @@ Env vars (required):
   REDDIT_CSRF      - csrf_token cookie value (optional but recommended)
   REDDIT_LOID      - loid cookie value (optional but recommended)
   REDDIT_MODHASH   - modhash for write operations (optional, fetched from /api/me.json if not provided)
+  REDDIT_PROXY     - HTTP/HTTPS proxy URL, e.g. http://user:pass@host:port (optional)
 
 Usage:
   reddit-fetch.py me
@@ -67,7 +68,11 @@ def _get_session() -> cffi_requests.Session:
     """Get or create a curl_cffi session with Chrome impersonation."""
     global _session
     if _session is None:
-        _session = cffi_requests.Session(impersonate="chrome")
+        proxy = os.environ.get("REDDIT_PROXY")
+        kwargs: Dict[str, Any] = {"impersonate": "chrome"}
+        if proxy:
+            kwargs["proxies"] = {"http": proxy, "https": proxy}
+        _session = cffi_requests.Session(**kwargs)
     return _session
 
 

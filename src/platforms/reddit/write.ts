@@ -21,8 +21,8 @@ import {
 } from '../../http/reddit-bridge.js';
 
 /** Convert stored cookie credentials to bridge format. */
-function cookieCreds(c: { session: string; modhash?: string; csrfToken?: string; loid?: string }): RedditCookieCreds {
-  return { session: c.session, csrfToken: c.csrfToken, loid: c.loid, modhash: c.modhash };
+function cookieCreds(c: { session: string; modhash?: string; csrfToken?: string; loid?: string }, proxy?: string): RedditCookieCreds {
+  return { session: c.session, csrfToken: c.csrfToken, loid: c.loid, modhash: c.modhash, proxy };
 }
 
 export interface RedditWriteResult {
@@ -82,7 +82,8 @@ export async function submitComment(
   text: string,
   account?: string,
   dataDir?: string,
-  force?: boolean
+  force?: boolean,
+  proxy?: string
 ): Promise<RedditWriteResult> {
   await checkWriteLimit('reddit', 'comment', dataDir);
   if (!force) {
@@ -93,7 +94,7 @@ export async function submitComment(
   const creds = await loadRedditCredentials(account, dataDir);
   if (creds?.type === 'cookie') {
     await writeDelay();
-    const { id } = await bridgeComment(parentId, text, cookieCreds(creds));
+    const { id } = await bridgeComment(parentId, text, cookieCreds(creds, proxy));
     await recordWrite('reddit', 'comment', text, parentId, dataDir);
     return { success: true, id, message: `commented:${id} on:${parentId}` };
   }
@@ -130,14 +131,15 @@ export async function vote(
   id: string,           // fullname: t1_ or t3_
   direction: 1 | 0 | -1,
   account?: string,
-  dataDir?: string
+  dataDir?: string,
+  proxy?: string
 ): Promise<RedditWriteResult> {
   await checkWriteLimit('reddit', 'upvote', dataDir);
 
   const creds = await loadRedditCredentials(account, dataDir);
   if (creds?.type === 'cookie') {
     await writeDelay();
-    await bridgeVote(id, direction, cookieCreds(creds));
+    await bridgeVote(id, direction, cookieCreds(creds, proxy));
     const dirLabel = direction === 1 ? 'upvoted' : direction === -1 ? 'downvoted' : 'unvoted';
     return { success: true, message: `${dirLabel}:${id}` };
   }
@@ -164,12 +166,13 @@ export async function vote(
 export async function deleteItem(
   id: string,   // fullname: t3_<postId> or t1_<commentId>
   account?: string,
-  dataDir?: string
+  dataDir?: string,
+  proxy?: string
 ): Promise<RedditWriteResult> {
   const creds = await loadRedditCredentials(account, dataDir);
   if (creds?.type === 'cookie') {
     await writeDelay();
-    await bridgeDelete(id, cookieCreds(creds));
+    await bridgeDelete(id, cookieCreds(creds, proxy));
     return { success: true, message: `deleted:${id}` };
   }
 
@@ -190,14 +193,15 @@ export async function deleteItem(
 export async function saveItem(
   id: string,
   account?: string,
-  dataDir?: string
+  dataDir?: string,
+  proxy?: string
 ): Promise<RedditWriteResult> {
   await checkWriteLimit('reddit', 'save', dataDir);
 
   const creds = await loadRedditCredentials(account, dataDir);
   if (creds?.type === 'cookie') {
     await writeDelay();
-    await bridgeSaveItem(id, cookieCreds(creds));
+    await bridgeSaveItem(id, cookieCreds(creds, proxy));
     return { success: true, message: `saved:${id}` };
   }
 
@@ -219,7 +223,8 @@ export async function subscribeSubreddit(
   subreddit: string,
   action: 'sub' | 'unsub',
   account?: string,
-  dataDir?: string
+  dataDir?: string,
+  proxy?: string
 ): Promise<RedditWriteResult> {
   await checkWriteLimit('reddit', 'subscribe', dataDir);
 
@@ -227,10 +232,10 @@ export async function subscribeSubreddit(
   if (creds?.type === 'cookie') {
     await writeDelay();
     if (action === 'sub') {
-      await bridgeSubscribe(subreddit, cookieCreds(creds));
+      await bridgeSubscribe(subreddit, cookieCreds(creds, proxy));
       return { success: true, message: `subscribed to:r/${subreddit}` };
     } else {
-      await bridgeUnsubscribe(subreddit, cookieCreds(creds));
+      await bridgeUnsubscribe(subreddit, cookieCreds(creds, proxy));
       return { success: true, message: `unsubscribed from:r/${subreddit}` };
     }
   }
@@ -267,7 +272,8 @@ export async function submitTextPost(
   text: string,
   account?: string,
   dataDir?: string,
-  force?: boolean
+  force?: boolean,
+  proxy?: string
 ): Promise<RedditWriteResult> {
   await checkWriteLimit('reddit', 'comment', dataDir);
   if (!force) {
@@ -278,7 +284,7 @@ export async function submitTextPost(
   const creds = await loadRedditCredentials(account, dataDir);
   if (creds?.type === 'cookie') {
     await writeDelay();
-    const { id } = await bridgeSubmitPost(subreddit, title, text, cookieCreds(creds));
+    const { id } = await bridgeSubmitPost(subreddit, title, text, cookieCreds(creds, proxy));
     await recordWrite('reddit', 'text-post', `${title} ${text}`, subreddit, dataDir);
     return { success: true, id, message: `text_post:${id} to:r/${subreddit}` };
   }
@@ -319,7 +325,8 @@ export async function submitPost(
   url: string,
   account?: string,
   dataDir?: string,
-  force?: boolean
+  force?: boolean,
+  proxy?: string
 ): Promise<RedditWriteResult> {
   await checkWriteLimit('reddit', 'comment', dataDir);
   if (!force) {
@@ -330,7 +337,7 @@ export async function submitPost(
   const creds = await loadRedditCredentials(account, dataDir);
   if (creds?.type === 'cookie') {
     await writeDelay();
-    const { id } = await bridgeLinkPost(subreddit, title, url, cookieCreds(creds));
+    const { id } = await bridgeLinkPost(subreddit, title, url, cookieCreds(creds, proxy));
     await recordWrite('reddit', 'post', title, subreddit, dataDir);
     return { success: true, id, message: `submitted:${id} to:r/${subreddit}` };
   }
@@ -372,7 +379,8 @@ export async function crosspost(
   title: string,
   account?: string,
   dataDir?: string,
-  force?: boolean
+  force?: boolean,
+  proxy?: string
 ): Promise<RedditWriteResult> {
   await checkWriteLimit('reddit', 'comment', dataDir);
   if (!force) {
@@ -384,7 +392,7 @@ export async function crosspost(
   const bareId = postId.replace(/^t3_/, '');
   if (creds?.type === 'cookie') {
     await writeDelay();
-    const { id } = await bridgeCrosspost(targetSubreddit, title, `t3_${bareId}`, cookieCreds(creds));
+    const { id } = await bridgeCrosspost(targetSubreddit, title, `t3_${bareId}`, cookieCreds(creds, proxy));
     await recordWrite('reddit', 'crosspost', title, targetSubreddit, dataDir);
     return { success: true, id, message: `crossposted:t3_${bareId} to:r/${targetSubreddit} new_id:${id}` };
   }
