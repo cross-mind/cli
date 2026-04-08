@@ -18,7 +18,7 @@ import { AuthError } from '../http/client.js';
 export const REDDIT_CLIENT_ID = process.env['REDDIT_CLIENT_ID'] ?? 'YOUR_REDDIT_CLIENT_ID';
 const REDDIT_REDIRECT_PORT = 7879;
 const REDDIT_REDIRECT_URI = `http://127.0.0.1:${REDDIT_REDIRECT_PORT}/callback`;
-const REDDIT_UA = 'crossmind-cli/1.0 (crossmind.io)';
+const REDDIT_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15';
 
 const REDDIT_OAUTH_CONFIG: OAuthConfig = {
   clientId: REDDIT_CLIENT_ID,
@@ -188,9 +188,6 @@ export function redditCookieHeaders(
     'Cookie': cookieParts.join('; '),
     'User-Agent': REDDIT_UA,
     'Accept': 'application/json',
-    'sec-ch-ua': '"Chromium";v="133", "Not(A:Brand";v="99", "Google Chrome";v="133"',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': '"macOS"',
   };
   if (modhash) {
     headers['x-modhash'] = modhash;

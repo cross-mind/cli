@@ -55,7 +55,7 @@ except ImportError:
 # ── Constants ────────────────────────────────────────────────────────────────
 
 REDDIT_API = "https://www.reddit.com"
-USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
+USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15"
 
 # ── Session Management ───────────────────────────────────────────────────────
 
@@ -69,7 +69,7 @@ def _get_session() -> cffi_requests.Session:
     global _session
     if _session is None:
         proxy = os.environ.get("REDDIT_PROXY")
-        kwargs: Dict[str, Any] = {"impersonate": "chrome"}
+        kwargs: Dict[str, Any] = {"impersonate": "safari"}
         if proxy:
             kwargs["proxies"] = {"http": proxy, "https": proxy}
         _session = cffi_requests.Session(**kwargs)
@@ -77,13 +77,12 @@ def _get_session() -> cffi_requests.Session:
 
 
 def _get_cookies() -> Dict[str, str]:
-    """Build cookies dict from env vars."""
+    """Build cookies dict from env vars. Session is optional for public read-only requests."""
     cookies = {}
 
     session = os.environ.get("REDDIT_SESSION")
-    if not session:
-        raise ValueError("REDDIT_SESSION env var is required")
-    cookies["reddit_session"] = session
+    if session:
+        cookies["reddit_session"] = session
 
     csrf = os.environ.get("REDDIT_CSRF")
     if csrf:
@@ -102,9 +101,6 @@ def _get_headers() -> Dict[str, str]:
         "User-Agent": USER_AGENT,
         "Accept": "application/json",
         "Accept-Language": "en-US,en;q=0.9",
-        "sec-ch-ua": '"Chromium";v="133", "Not(A:Brand";v="99", "Google Chrome";v="133"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"macOS"',
     }
 
 

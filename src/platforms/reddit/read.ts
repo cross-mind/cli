@@ -13,7 +13,7 @@ import {
   redditHeaders, redditCookieHeaders, redditPublicHeaders,
 } from '../../auth/reddit.js';
 import {
-  bridgeSubreddit, bridgeSearch, bridgeUser, bridgeUserPosts, bridgePost as bridgePostFetch,
+  bridgeSubreddit, bridgeSearch, bridgeSearchPublic, bridgeUser, bridgeUserPosts, bridgePost as bridgePostFetch,
   bridgeHome, bridgeSaved,
   type RedditCookieCreds,
 } from '../../http/reddit-bridge.js';
@@ -123,11 +123,16 @@ export async function searchReddit(
   if (creds?.type === 'cookie') {
     return bridgeSearch(query, subreddit, sort, limit, cookieCreds(creds, proxy));
   }
-  const { baseUrl, headers } = await resolveAuth(account, dataDir);
-  const subredditPath = subreddit ? `/r/${subreddit}` : '';
-  const url = `${baseUrl}${subredditPath}/search.json?q=${encodeURIComponent(query)}&sort=${sort}&limit=${Math.min(limit, 100)}&restrict_sr=${subreddit ? 'true' : 'false'}`;
-  const data = await request<{ data: { children: Record<string, unknown>[] } }>(url, { headers });
-  return (data.data.children ?? []).slice(0, limit).map((child, i) => mapPost(child, i));
+  // OAuth: use authenticated API directly (oauth.reddit.com, no TLS issues)
+  if (creds?.type === 'oauth') {
+    const { baseUrl, headers } = await resolveAuth(account, dataDir);
+    const subredditPath = subreddit ? `/r/${subreddit}` : '';
+    const url = `${baseUrl}${subredditPath}/search.json?q=${encodeURIComponent(query)}&sort=${sort}&limit=${Math.min(limit, 100)}&restrict_sr=${subreddit ? 'true' : 'false'}`;
+    const data = await request<{ data: { children: Record<string, unknown>[] } }>(url, { headers });
+    return (data.data.children ?? []).slice(0, limit).map((child, i) => mapPost(child, i));
+  }
+  // No auth: use Python bridge for Chrome TLS impersonation (www.reddit.com blocks Node.js TLS with 403)
+  return bridgeSearchPublic(query, subreddit, sort, limit);
 }
 
 // ── Phase 2 additional interfaces ─────────────────────────────────────────

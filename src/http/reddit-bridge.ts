@@ -288,6 +288,16 @@ export async function bridgeSearch(
   return (result.data ?? []).slice(0, limit).map((p, i) => mapCliPost(p, i + 1));
 }
 
+/** Search Reddit without session credentials (Chrome TLS impersonation only). */
+export async function bridgeSearchPublic(
+  query: string,
+  subreddit: string | undefined,
+  sort: string,
+  limit: number
+): Promise<RedditPost[]> {
+  return bridgeSearch(query, subreddit, sort, limit, { session: '' });
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
