@@ -297,13 +297,14 @@ export async function getPost(
   limit: number,
   account?: string,
   dataDir?: string,
-  proxy?: string
+  proxy?: string,
+  full?: boolean
 ): Promise<RedditPostDetail> {
   const creds = await loadRedditCredentials(account, dataDir);
   if (creds?.type === 'cookie') {
     // bridge uses subreddit='' — reddit-fetch.py fetches from /comments/<id>.json
     const id = postId.replace(/^t3_/, '');
-    return bridgePostFetch('', id, limit, cookieCreds(creds, proxy));
+    return bridgePostFetch('', id, limit, cookieCreds(creds, proxy), full);
   }
   const { baseUrl, headers } = await resolveAuth(account, dataDir);
   // Strip t3_ prefix if present
@@ -318,9 +319,11 @@ export async function getPost(
   const postData = (postChildren[0] as { data?: Record<string, unknown> })?.data ?? {};
   const post = mapPost(postChildren[0] ?? {}, 0);
   if (postData['selftext'] && String(postData['selftext']).length > 0) {
-    post.selftext = String(postData['selftext']).replace(/\n{3,}/g, '\n\n').trim().slice(0, 2000);
+    const raw = String(postData['selftext']).replace(/\n{3,}/g, '\n\n').trim();
+    post.selftext = full ? raw : raw.slice(0, 2000);
   }
 
+  const bodyLimit = full ? 5000 : 200;
   const commentChildren = data[1]?.data?.children ?? [];
   const comments: RedditComment[] = [];
   let rank = 1;
@@ -331,7 +334,7 @@ export async function getPost(
         rank: rank++,
         id: String(d['id'] ?? ''),
         author: String(d['author'] ?? ''),
-        body: String(d['body'] ?? '').replace(/\n/g, ' ').slice(0, 200),
+        body: String(d['body'] ?? '').replace(/\n/g, ' ').slice(0, bodyLimit),
         score: Number(d['score'] ?? 0),
         subreddit: String(d['subreddit'] ?? ''),
         url: `https://reddit.com${d['permalink'] ?? ''}`,

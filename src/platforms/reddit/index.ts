@@ -227,15 +227,16 @@ Auth requirements:
     .command('read <post_id> [limit]')
     .description('Read a post with its top-level comments (post_id: bare ID or t3_xxx)')
     .option('--sort <sort>', 'Comment sort: best, top, new, controversial, old', 'best')
+    .option('--full', 'Return full post body and complete comment text without truncation')
     .option('--account <name>', 'Account to use')
     .option('--data-dir <dir>', 'Data directory override')
     .option('--proxy <url>', 'SOCKS5/HTTP proxy URL (e.g. socks5h://user:pass@host:port)')
     .option('--json', 'Output as JSON')
-    .action(async (postId: string, limitArg: string | undefined, opts: { sort: string; account?: string; dataDir?: string; proxy?: string; json?: boolean }) => {
+    .action(async (postId: string, limitArg: string | undefined, opts: { sort: string; full?: boolean; account?: string; dataDir?: string; proxy?: string; json?: boolean }) => {
       const start = Date.now();
       const limit = limitArg ? parseInt(limitArg, 10) : 25;
       try {
-        const detail = await getPost(postId, opts.sort as 'best', limit, opts.account, opts.dataDir, opts.proxy);
+        const detail = await getPost(postId, opts.sort as 'best', limit, opts.account, opts.dataDir, opts.proxy, opts.full);
         if (opts.json) {
           console.log(JSON.stringify(detail, null, 2));
         } else {

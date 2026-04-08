@@ -112,7 +112,7 @@ interface CliResponse<T> {
 
 // ── Mappers ──────────────────────────────────────────────────────────────────
 
-function mapCliPost(p: CliPost, rank: number): RedditPost {
+function mapCliPost(p: CliPost, rank: number, full?: boolean): RedditPost {
   const post: RedditPost = {
     rank,
     id: String(p.id ?? ''),
@@ -127,17 +127,18 @@ function mapCliPost(p: CliPost, rank: number): RedditPost {
     flair: String(p.link_flair_text ?? ''),
   };
   if (p.selftext) {
-    post.selftext = String(p.selftext).replace(/\n{3,}/g, '\n\n').trim().slice(0, 2000);
+    const raw = String(p.selftext).replace(/\n{3,}/g, '\n\n').trim();
+    post.selftext = full ? raw : raw.slice(0, 2000);
   }
   return post;
 }
 
-function mapCliComment(c: CliComment, rank: number): RedditComment {
+function mapCliComment(c: CliComment, rank: number, full?: boolean): RedditComment {
   return {
     rank,
     id: String(c.id ?? ''),
     author: String(c.author ?? ''),
-    body: String(c.body ?? '').replace(/\n/g, ' ').slice(0, 200),
+    body: String(c.body ?? '').replace(/\n/g, ' ').slice(0, full ? 5000 : 200),
     score: Number(c.score ?? 0),
     subreddit: String(c.subreddit ?? ''),
     url: c.permalink ? `https://reddit.com${c.permalink}` : '',
@@ -265,7 +266,8 @@ export async function bridgePost(
   subreddit: string,
   postId: string,
   limit: number,
-  creds: RedditCookieCreds
+  creds: RedditCookieCreds,
+  full?: boolean
 ): Promise<RedditPostDetail> {
   const result = await runFetch<CliResponse<CliPostDetail>>(
     creds, ['read-post', subreddit, postId, '--count', String(limit)]
@@ -273,8 +275,8 @@ export async function bridgePost(
   if (!result.ok) throw new Error(result.error?.message ?? 'Post fetch failed');
   const d = result.data ?? { post: {} as CliPost, comments: [] };
   return {
-    post: mapCliPost(d.post, 1),
-    comments: (d.comments ?? []).slice(0, limit).map((c, i) => mapCliComment(c, i + 1)),
+    post: mapCliPost(d.post, 1, full),
+    comments: (d.comments ?? []).slice(0, limit).map((c, i) => mapCliComment(c, i + 1, full)),
   };
 }
 
