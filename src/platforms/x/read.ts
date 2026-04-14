@@ -106,7 +106,7 @@ export async function searchTweets(
     return bridgeSearchTweets(query, limit, creds);
   }
 
-  // Token / no-auth → v2 REST
+  // Token / no-auth → v2 REST (uses env X_BEARER_TOKEN or public fallback)
   const params = new URLSearchParams({
     query,
     max_results: String(Math.min(limit, 100)),
@@ -460,9 +460,35 @@ export async function getLikes(
   });
 }
 
+/**
+ * Parse a --since value into an ISO 8601 string.
+ * Accepts: relative shorthand ("24h", "7d", "30m"), date-only ("2026-04-10"), or full ISO.
+ */
+function parseSince(since: string): string {
+  const rel = since.match(/^(\d+)(m|h|d|w)$/);
+  if (rel) {
+    const n = parseInt(rel[1], 10);
+    const unit = rel[2];
+    const ms = unit === 'm' ? n * 60_000
+      : unit === 'h' ? n * 3_600_000
+      : unit === 'd' ? n * 86_400_000
+      : n * 7 * 86_400_000;
+    return new Date(Date.now() - ms).toISOString();
+  }
+  // date-only → start of that day in UTC
+  if (/^\d{4}-\d{2}-\d{2}$/.test(since)) {
+    return new Date(since + 'T00:00:00Z').toISOString();
+  }
+  // assume already ISO
+  const d = new Date(since);
+  if (isNaN(d.getTime())) throw new Error(`Invalid --since value: "${since}"`);
+  return d.toISOString();
+}
+
 /** Get DM events list (requires OAuth with dm.read scope). */
 export async function getDMList(
   limit: number,
+  since?: string,
   account?: string,
   dataDir?: string
 ): Promise<XDMEvent[]> {
@@ -475,23 +501,53 @@ export async function getDMList(
       '  Setup guide: https://crossmind.io/docs/x-setup'
     );
   }
-  const params = new URLSearchParams({
-    max_results: String(Math.min(limit, 100)),
-    event_types: 'MessageCreate',
-    'dm_event.fields': 'sender_id,created_at,text,dm_conversation_id',
-    expansions: 'sender_id',
-    'user.fields': 'username',
-  });
-  const data = await xRequest<{
-    data?: Record<string, unknown>[];
-    includes?: { users?: Record<string, unknown>[] };
-  }>(`/2/dm_events?${params}`, { creds });
 
-  const users = data.includes?.users ?? [];
+  // X v2 /2/dm_events does not support start_time — paginate and filter client-side.
+  const sinceMs = since ? new Date(parseSince(since)).getTime() : undefined;
+  const pageSize = Math.min(since ? 100 : limit, 100);
+  const hardCap = since ? 500 : limit;
+  const allEvents: Record<string, unknown>[] = [];
+  const allUsers: Record<string, unknown>[] = [];
+  let nextToken: string | undefined;
+  let reachedCutoff = false;
+
+  do {
+    const params = new URLSearchParams({
+      max_results: String(pageSize),
+      event_types: 'MessageCreate',
+      'dm_event.fields': 'sender_id,created_at,text,dm_conversation_id',
+      expansions: 'sender_id',
+      'user.fields': 'username',
+    });
+    if (nextToken) params.set('pagination_token', nextToken);
+
+    const data = await xRequest<{
+      data?: Record<string, unknown>[];
+      includes?: { users?: Record<string, unknown>[] };
+      meta?: { next_token?: string };
+    }>(`/2/dm_events?${params}`, { creds });
+
+    const page = data.data ?? [];
+    allUsers.push(...(data.includes?.users ?? []));
+
+    if (sinceMs !== undefined) {
+      // Keep only events at or after cutoff; stop paginating once we pass it
+      for (const e of page) {
+        const ts = new Date(String(e['created_at'] ?? '')).getTime();
+        if (!isNaN(ts) && ts < sinceMs) { reachedCutoff = true; break; }
+        allEvents.push(e);
+      }
+    } else {
+      allEvents.push(...page);
+    }
+
+    nextToken = data.meta?.next_token;
+  } while (nextToken && !reachedCutoff && allEvents.length < hardCap);
+
   const userMap: Record<string, string> = {};
-  for (const u of users) userMap[String(u['id'])] = String(u['username'] ?? '');
+  for (const u of allUsers) userMap[String(u['id'])] = String(u['username'] ?? '');
 
-  return (data.data ?? []).slice(0, limit).map((e, i) => ({
+  return allEvents.slice(0, hardCap).map((e, i) => ({
     rank: i + 1,
     id: String(e['id'] ?? ''),
     sender: userMap[String(e['sender_id'])] ?? String(e['sender_id'] ?? ''),
@@ -500,6 +556,9 @@ export async function getDMList(
     created_at: String(e['created_at'] ?? '').slice(0, 16).replace('T', ' '),
   }));
 }
+
+/** In-process cache for username → user ID lookups (avoids redundant API calls). */
+const _usernameIdCache = new Map<string, string>();
 
 /** Get DM conversation with a specific user (requires OAuth with dm.read scope). */
 export async function getDMConversation(
@@ -517,11 +576,17 @@ export async function getDMConversation(
       '  Setup guide: https://crossmind.io/docs/x-setup'
     );
   }
-  const targetData = await xRequest<{ data: { id: string } }>(
-    `/2/users/by/username/${participantUsername}`,
-    { creds }
-  );
-  const participantId = targetData.data.id;
+
+  const cacheKey = participantUsername.toLowerCase();
+  let participantId = _usernameIdCache.get(cacheKey);
+  if (!participantId) {
+    const targetData = await xRequest<{ data: { id: string } }>(
+      `/2/users/by/username/${participantUsername}`,
+      { creds }
+    );
+    participantId = targetData.data.id;
+    _usernameIdCache.set(cacheKey, participantId);
+  }
 
   const params = new URLSearchParams({
     max_results: String(Math.min(limit, 100)),

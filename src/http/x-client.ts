@@ -12,8 +12,10 @@ import { request, AuthError, type RequestOptions } from './client.js';
 
 const X_API_BASE = 'https://api.twitter.com';
 
-// Twitter internal app bearer — used for public v2 REST calls
-const X_BEARER_REST = 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I4xNp1YjHJj%2BI9m5FkS4bCZ3m0E';
+// Bearer tokens — prefer env vars, fallback to hardcoded public tokens
+const X_BEARER_REST = process.env['X_BEARER_TOKEN']
+  ? `Bearer ${process.env['X_BEARER_TOKEN']}`
+  : 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I4xNp1YjHJj%2BI9m5FkS4bCZ3m0E';
 
 // Twitter/X internal GraphQL bearer — required when calling x.com/i/api/graphql
 const X_BEARER_GQL = 'Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';

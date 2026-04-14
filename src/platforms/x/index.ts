@@ -266,14 +266,15 @@ Auth requirements:
   x
     .command('dm-list [limit]')
     .description('Get recent DM events (requires OAuth with dm.read scope)')
+    .option('--since <value>', 'Filter DMs after this time (e.g. 24h, 7d, 2026-04-10, ISO string). Enables cursor pagination up to 500 results.')
     .option('--account <name>', 'Account to use')
     .option('--data-dir <dir>', 'Data directory override')
     .option('--json', 'Output as JSON array')
-    .action(async (limitArg: string | undefined, opts: { account?: string; dataDir?: string; json?: boolean }) => {
+    .action(async (limitArg: string | undefined, opts: { since?: string; account?: string; dataDir?: string; json?: boolean }) => {
       const start = Date.now();
       const limit = limitArg ? parseInt(limitArg, 10) : 20;
       try {
-        const items = await getDMList(limit, opts.account, opts.dataDir);
+        const items = await getDMList(limit, opts.since, opts.account, opts.dataDir);
         printOutput(items as unknown as Record<string, unknown>[], DM_TEMPLATE, 'x/dm-list', start, { json: opts.json });
       } catch (err) {
         console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);

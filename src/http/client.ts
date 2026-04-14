@@ -50,21 +50,24 @@ export async function request<T = unknown>(
 ): Promise<T> {
   const { method = 'GET', headers = {}, body, timeout = 15000, retries = 3 } = opts;
 
-  const init: RequestInit = {
-    method,
-    headers: { 'Accept': 'application/json', ...headers },
-    signal: AbortSignal.timeout(timeout),
-  };
+  const baseHeaders = { 'Accept': 'application/json', ...headers };
 
   if (body !== undefined) {
-    init.body = JSON.stringify(body);
-    (init.headers as Record<string, string>)['Content-Type'] = 'application/json';
+    (baseHeaders as Record<string, string>)['Content-Type'] = 'application/json';
   }
 
   let lastError: Error = new NetworkError('Unknown error');
   let delay = 1000;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
+    // Create a fresh AbortSignal per attempt — a fired signal cannot be reused
+    // and passing an already-aborted signal to fetch() causes an immediate abort.
+    const init: RequestInit = {
+      method,
+      headers: baseHeaders,
+      signal: AbortSignal.timeout(timeout),
+    };
+    if (body !== undefined) init.body = JSON.stringify(body);
     try {
       const res = await fetch(url, init);
 
