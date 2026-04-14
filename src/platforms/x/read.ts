@@ -489,6 +489,7 @@ function parseSince(since: string): string {
 export async function getDMList(
   limit: number,
   since?: string,
+  until?: string,
   account?: string,
   dataDir?: string
 ): Promise<XDMEvent[]> {
@@ -502,10 +503,13 @@ export async function getDMList(
     );
   }
 
-  // X v2 /2/dm_events does not support start_time — paginate and filter client-side.
+  // X v2 /2/dm_events does not support start_time/end_time — paginate and filter client-side.
+  // API returns newest-first, so: skip events newer than untilMs, collect until sinceMs.
   const sinceMs = since ? new Date(parseSince(since)).getTime() : undefined;
-  const pageSize = Math.min(since ? 100 : limit, 100);
-  const hardCap = since ? 500 : limit;
+  const untilMs = until ? new Date(parseSince(until)).getTime() : undefined;
+  const hasFilter = sinceMs !== undefined || untilMs !== undefined;
+  const pageSize = Math.min(hasFilter ? 100 : limit, 100);
+  const hardCap = hasFilter ? 500 : limit;
   const allEvents: Record<string, unknown>[] = [];
   const allUsers: Record<string, unknown>[] = [];
   let nextToken: string | undefined;
@@ -530,11 +534,12 @@ export async function getDMList(
     const page = data.data ?? [];
     allUsers.push(...(data.includes?.users ?? []));
 
-    if (sinceMs !== undefined) {
-      // Keep only events at or after cutoff; stop paginating once we pass it
+    if (hasFilter) {
       for (const e of page) {
         const ts = new Date(String(e['created_at'] ?? '')).getTime();
-        if (!isNaN(ts) && ts < sinceMs) { reachedCutoff = true; break; }
+        if (isNaN(ts)) continue;
+        if (untilMs !== undefined && ts > untilMs) continue; // too recent, skip
+        if (sinceMs !== undefined && ts < sinceMs) { reachedCutoff = true; break; } // too old, stop
         allEvents.push(e);
       }
     } else {
