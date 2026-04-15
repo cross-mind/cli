@@ -1073,18 +1073,30 @@ def _v1_post(path: str, form_data: str) -> None:
     resp.raise_for_status()
 
 def cmd_follow(username: str) -> None:
-    """Follow a user via v1.1 friendships/create (cookie auth)."""
+    """Follow a user via v1.1 friendships/create (cookie auth, uses numeric user_id)."""
+    # Resolve username → numeric user_id first (screen_name causes 401 on v1.1)
+    user_vars = {"screen_name": username, "withSafetyModeUserFields": True}
+    user_data = _gql_get("UserByScreenName", user_vars)
+    user_id = _dig(user_data, "data", "user", "result", "rest_id")
+    if not user_id:
+        raise ValueError(f"Could not resolve user_id for @{username}")
     _v1_post(
         "friendships/create.json",
-        f"screen_name={urllib.parse.quote(username)}&include_entities=true"
+        f"user_id={urllib.parse.quote(user_id)}&include_entities=true"
     )
     _out(True, {"following": True})
 
 def cmd_unfollow(username: str) -> None:
-    """Unfollow a user via v1.1 friendships/destroy (cookie auth)."""
+    """Unfollow a user via v1.1 friendships/destroy (cookie auth, uses numeric user_id)."""
+    # Resolve username → numeric user_id first (screen_name causes 401 on v1.1)
+    user_vars = {"screen_name": username, "withSafetyModeUserFields": True}
+    user_data = _gql_get("UserByScreenName", user_vars)
+    user_id = _dig(user_data, "data", "user", "result", "rest_id")
+    if not user_id:
+        raise ValueError(f"Could not resolve user_id for @{username}")
     _v1_post(
         "friendships/destroy.json",
-        f"screen_name={urllib.parse.quote(username)}&include_entities=true"
+        f"user_id={urllib.parse.quote(user_id)}&include_entities=true"
     )
     _out(True, {"following": False})
 

@@ -127,7 +127,7 @@ export async function postTweet(
     return {
       success: true,
       id: result.id,
-      message: `posted:${result.id} text:${text.slice(0, 50)}${text.length > 50 ? '...' : ''}`,
+      message: `posted:${result.id} text:${text.slice(0, 50)}${text.length > 50 ? '...' : ''} [auth:cookie]`,
     };
   }
 
@@ -145,7 +145,7 @@ export async function postTweet(
   return {
     success: true,
     id: data.data.id,
-    message: `posted:${data.data.id} text:${text.slice(0, 50)}${text.length > 50 ? '...' : ''}${mediaIds?.length ? ` media:${mediaIds.length}` : ''}`,
+    message: `posted:${data.data.id} text:${text.slice(0, 50)}${text.length > 50 ? '...' : ''}${mediaIds?.length ? ` media:${mediaIds.length}` : ''} [auth:oauth]`,
   };
 }
 
@@ -165,14 +165,14 @@ export async function replyToTweet(
   const creds = await getXCreds(account, dataDir);
   await writeDelay();
 
-  // Prefer cookie auth (GraphQL, no tier restrictions)
+  // Prefer cookie auth (GraphQL, no API tier restrictions) when available
   if (!mediaIds?.length && creds.authToken && creds.ct0 && await isCookieClientAvailable()) {
     const result = await bridgeReply(tweetId, text, creds as { authToken: string; ct0: string });
     await recordWrite('x', 'reply', text, tweetId, dataDir);
     return {
       success: true,
       id: result.id,
-      message: `replied:${result.id} to:${tweetId}`,
+      message: `replied:${result.id} to:${tweetId} [auth:cookie]`,
     };
   }
 
@@ -188,7 +188,7 @@ export async function replyToTweet(
   return {
     success: true,
     id: data.data.id,
-    message: `replied:${data.data.id} to:${tweetId}${mediaIds?.length ? ` media:${mediaIds.length}` : ''}`,
+    message: `replied:${data.data.id} to:${tweetId}${mediaIds?.length ? ` media:${mediaIds.length}` : ''} [auth:oauth]`,
   };
 }
 
@@ -204,13 +204,13 @@ export async function likeTweet(
   // Prefer cookie auth (GraphQL)
   if (creds.authToken && creds.ct0 && await isCookieClientAvailable()) {
     await bridgeLike(tweetId, creds as { authToken: string; ct0: string });
-    return { success: true, message: `liked:${tweetId}` };
+    return { success: true, message: `liked:${tweetId} [auth:cookie]` };
   }
 
   const meData = await xRequest<{ data: { id: string } }>('/2/users/me', { creds });
   const userId = meData.data.id;
   await xRequest(`/2/users/${userId}/likes`, { method: 'POST', creds, body: { tweet_id: tweetId } });
-  return { success: true, message: `liked:${tweetId}` };
+  return { success: true, message: `liked:${tweetId} [auth:oauth]` };
 }
 
 /** Retweet */
@@ -225,13 +225,13 @@ export async function retweetTweet(
   // Prefer cookie auth (GraphQL)
   if (creds.authToken && creds.ct0 && await isCookieClientAvailable()) {
     const result = await bridgeRetweet(tweetId, creds as { authToken: string; ct0: string });
-    return { success: true, id: result.id, message: `retweeted:${tweetId}` };
+    return { success: true, id: result.id, message: `retweeted:${tweetId} [auth:cookie]` };
   }
 
   const meData = await xRequest<{ data: { id: string } }>('/2/users/me', { creds });
   const userId = meData.data.id;
   await xRequest(`/2/users/${userId}/retweets`, { method: 'POST', creds, body: { tweet_id: tweetId } });
-  return { success: true, message: `retweeted:${tweetId}` };
+  return { success: true, message: `retweeted:${tweetId} [auth:oauth]` };
 }
 
 /** Follow a user by username */
@@ -243,14 +243,16 @@ export async function followUser(
   const creds = await getXCreds(account, dataDir);
   await writeDelay();
 
-  // Try cookie auth first (v1.1 REST). Requires full browser cookie string;
-  // with only auth_token + ct0 this returns 401 — fall through to OAuth.
+  // Try cookie auth first (v1.1 REST via x-fetch.py bridge).
+  // NOTE: v1.1 friendships/create requires the full browser cookie set.
+  // With only auth_token + ct0, the bridge returns 401 and we fall through to OAuth.
+  // Each OAuth follow costs 3 API calls: users/me + users/by/username + users/{id}/following.
   if (creds.authToken && creds.ct0 && await isCookieClientAvailable()) {
     try {
       await bridgeFollow(username, creds as { authToken: string; ct0: string });
-      return { success: true, message: `following:@${username}` };
+      return { success: true, message: `following:@${username} [auth:cookie]` };
     } catch {
-      // Cookie-only insufficient for v1.1; fall through to OAuth v2
+      // Cookie-only insufficient for v1.1 (needs full browser cookie set); fall through to OAuth v2
     }
   }
 
@@ -259,7 +261,7 @@ export async function followUser(
   const targetData = await xRequest<{ data: { id: string } }>(`/2/users/by/username/${username}`, { creds });
   const targetId = targetData.data.id;
   await xRequest(`/2/users/${myId}/following`, { method: 'POST', creds, body: { target_user_id: targetId } });
-  return { success: true, message: `following:@${username}` };
+  return { success: true, message: `following:@${username} [auth:oauth]` };
 }
 
 /** Send a DM */
@@ -318,7 +320,7 @@ export async function sendDM(
   return {
     success: true,
     id: data.data.dm_conversation_id,
-    message: `dm_sent to:@${username} text:${text.slice(0, 50)}`,
+    message: `dm_sent to:@${username} text:${text.slice(0, 50)} [auth:oauth]`,
   };
 }
 
@@ -462,11 +464,13 @@ export async function unfollowUser(
   const creds = await getXCreds(account, dataDir);
   await writeDelay();
 
-  // Try cookie auth first (v1.1 REST); fall through to OAuth if insufficient.
+  // Try cookie auth first (v1.1 REST via x-fetch.py bridge).
+  // NOTE: v1.1 friendships/destroy requires the full browser cookie set.
+  // With only auth_token + ct0, falls through to OAuth (3 API calls).
   if (creds.authToken && creds.ct0 && await isCookieClientAvailable()) {
     try {
       await bridgeUnfollow(username, creds as { authToken: string; ct0: string });
-      return { success: true, message: `unfollowed:@${username}` };
+      return { success: true, message: `unfollowed:@${username} [auth:cookie]` };
     } catch {
       // Cookie-only insufficient for v1.1; fall through to OAuth v2
     }
@@ -477,7 +481,7 @@ export async function unfollowUser(
   const targetData = await xRequest<{ data: { id: string } }>(`/2/users/by/username/${username}`, { creds });
   const targetId = targetData.data.id;
   await xRequest(`/2/users/${myId}/following/${targetId}`, { method: 'DELETE', creds });
-  return { success: true, message: `unfollowed:@${username}` };
+  return { success: true, message: `unfollowed:@${username} [auth:oauth]` };
 }
 
 /** Bookmark a tweet (cookie auth + curl_cffi required) */
